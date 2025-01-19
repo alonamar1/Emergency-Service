@@ -14,6 +14,8 @@ public abstract class BaseServer<T> implements Server<T> {
     private final Supplier<MessageEncoderDecoder<T>> encdecFactory;
     private ServerSocket sock;
 
+    private int connectionId = 0;
+
     public BaseServer(
             int port,
             Supplier<MessagingProtocol<T>> protocolFactory,
