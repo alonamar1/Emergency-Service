@@ -3,14 +3,17 @@ package bgu.spl.net.srv;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 
 public class ConnectionsImpl<T> implements Connections<T> {
 
-    private Map<Integer, Queue<T>> clients;
+    private Map<Integer, ConnectionHandler<T>> clients;
     private Map<String, List<Integer>> channelsSubscribers;
+
+    
     // TODO: Add a lock for each map
     // TODO: האם צריך להוסיף רשימה של ID ולאיזה צ'אנל הוא רשום
+    // TODO: לסנכרן ולהפוך threadsafe
+    // TODO: server type
     
     public ConnectionsImpl() {
         this.clients = new HashMap<>();
@@ -20,7 +23,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
     @Override
     public boolean send(int connectionId, T msg) {
         if (clients.containsKey(connectionId)) {
-            clients.get(connectionId).add(msg);
+            clients.get(connectionId).send(msg);
             return true;
         }
         return false;
