@@ -8,14 +8,12 @@ import bgu.spl.net.impl.stomp.User;
 
 public class ConnectionsImpl<T> implements Connections<T> {
 
-    private Map<Integer, String> connectionIdToUsername; // connectionId -> User
+    private Map<Integer, String> connectionIdToUsername; // connectionId -> username
 
-    private Map<String , User<T>> users; // User -> ConnectionHandler
+    private Map<String , User<T>> users; // username -> User
 
     private Map<String, Map<Integer,Integer>> channelsSubscribers; // channel -> connectionId -> SubscriptionId
 
-    
-    // TODO: Add a lock for each map
     // TODO: האם צריך להוסיף רשימה של ID ולאיזה צ'אנל הוא רשום
     // TODO: לסנכרן ולהפוך threadsafe
     // TODO: server type
