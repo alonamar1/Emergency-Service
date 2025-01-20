@@ -11,7 +11,7 @@ public class User<T> {
     private String password;
     private boolean isConnected;
     private int connectionId;
-    private Map<String, Integer> channels;
+    private Map<Integer, String> channels;
     private ConnectionHandler<T> connectionHandler;
 
     public User(String username, String password) {
@@ -59,15 +59,25 @@ public class User<T> {
         return this.connectionHandler;
     }
 
+    public Map<Integer, String> GetChannels() {
+        return this.channels;
+    }
+
 
     /**
      * Add a connection to a channel
      * @param channel
      * @return null if the user is not registered to the channel, otherwise return the Id for the channel
      */
-    public int GetConnectionIdInChannel(String channel) {
-        return this.channels.get(channel);
+    public String GetSubscriptionIdInChannel(int subscriptionId) {
+        return this.channels.get(subscriptionId);
     }
-    
 
+    public void addSubscriptionIdInChannel(String channel, int subscriptionId) {
+         this.channels.put(subscriptionId, channel);
+    }
+
+    public void removeSubscriptionIdInChannel(int subscriptionId) {
+        this.channels.remove(subscriptionId);
+    }
 }

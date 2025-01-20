@@ -9,6 +9,7 @@ public class StompMessageEncoderDecoder implements MessageEncoderDecoder<String>
     private byte[] bytes = new byte[1 << 10]; //start with 1k
     private int len = 0;
 
+    @Override
     public String decodeNextByte(byte nextByte) {
         if (nextByte == '\u0000') {
             return popString();
@@ -18,6 +19,7 @@ public class StompMessageEncoderDecoder implements MessageEncoderDecoder<String>
         return null; //not a line yet
     }
 
+    @Override
     public byte[] encode(String message) {
         return (message + '\u0000').getBytes(); //uses UTF8 by default
     }

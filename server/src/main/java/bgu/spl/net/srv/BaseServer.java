@@ -13,8 +13,7 @@ public abstract class BaseServer<T> implements Server<T> {
     private final Supplier<MessagingProtocol<T>> protocolFactory;
     private final Supplier<MessageEncoderDecoder<T>> encdecFactory;
     private ServerSocket sock;
-
-    private int connectionId = 0;
+    private int connectionId;
 
     public BaseServer(
             int port,
@@ -25,6 +24,7 @@ public abstract class BaseServer<T> implements Server<T> {
         this.protocolFactory = protocolFactory;
         this.encdecFactory = encdecFactory;
 		this.sock = null;
+        this.connectionId = 1;
     }
 
     @Override
@@ -38,13 +38,15 @@ public abstract class BaseServer<T> implements Server<T> {
             while (!Thread.currentThread().isInterrupted()) {
 
                 Socket clientSock = serverSock.accept();
+                System.out.println("Client detected");
 
                 BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<>(
                         clientSock,
                         encdecFactory.get(),
-                        protocolFactory.get());
+                        protocolFactory.get(), this.connectionId);
 
                 execute(handler);
+                this.connectionId++;
             }
         } catch (IOException ex) {
         }

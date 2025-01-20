@@ -1,0 +1,187 @@
+package bgu.spl.net.impl.stomp;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import bgu.spl.net.srv.ConnectionHandler;
+import bgu.spl.net.srv.Connections;
+import bgu.spl.net.srv.ConnectionsImpl;
+
+public class Frame {
+
+    private List<String> headers;
+    private List<String> body;
+    private String type;
+    private ConnectionsImpl<String> connections;
+    private int connectionId;
+    private ConnectionHandler<String> connectionHandler;
+
+    public Frame(String message, ConnectionsImpl connection, int conID, ConnectionHandler<String> connectionHandler) {
+        headers = new LinkedList<>();
+        body = new LinkedList<>();
+        String[] lines = message.split("\n");
+        this.type = lines[0];
+        int i = 1;
+        while (!lines[i].equals("")) {
+            this.headers.add(lines[i]);
+            i++;
+        }
+        i++;
+        while (i < lines.length) {
+            this.body.add(lines[i]);
+            i++;
+        }
+        this.connections = connection;
+        this.connectionId = conID;
+        this.connectionHandler = connectionHandler;
+    }
+
+    public List<String> getHeader() {
+        return headers;
+    }
+
+    public List<String> getBody() {
+        return body;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void process() {
+        switch (this.type) {
+            case "CONNECT":
+                processConnect();
+            case "SEND":
+                processSend();
+            case "SUBSCRIBE":
+                processSubsribe();
+            case "UNSUBSRICE":
+                processUnsubsribe();
+            case "DISCONNECT":
+                processDisconnect();
+            default:
+                throw new AssertionError("UNVALID FRAME TYPE");
+        }
+    }
+
+    public void processConnect() {
+        for (String line : headers) {
+            String[] parts = line.split(":");
+            User user = (User) (connections).getUsers().get(parts[1]);
+            if (parts[0].equals("accept-version")) {
+                if (!parts[1].equals("1.2")) {
+                    // TODO: sent an error frame
+                }
+            } else if (parts[0].equals("host")) {
+                if (!parts[1].equals("stomp.cs.bgu.ac.il")) {
+                    // TODO: sent an error frame
+                }
+            } else if (parts[0].equals("login")) {
+
+                if (user.IsConnected()) {
+                    // TODO: sent an error frame
+                }
+                if (!user.CheckUsername(parts[1])) {
+                    // TODO: sent an error frame
+                }
+                user.Connect(this.connectionId, connectionHandler);
+            } else if (parts[0].equals("passcode")) {
+                if (!user.CheckPassword(parts[1])) {
+                    // TODO: sent an error frame
+                }
+            }
+        }
+        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\n\u0000");
+    }
+
+    public void processSubsribe() {
+        // TODO: sent an error frame
+        int subscriptionId = -1;
+        String destination = "";
+        for (String line : headers) {
+            String[] parts = line.split(":");
+            if (parts[0].equals("destination")) {
+                destination = parts[1];
+            } else if (parts[0].equals("id")) {
+                subscriptionId = Integer.parseInt(parts[1]);
+            }
+        }
+        String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
+        connections.addSubscriber(destination, subscriptionId, (User) connections.getUsers().get(username));
+        // TODO: sent a receipt frame
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n\u0000");
+
+    }
+
+    public void processUnsubsribe() {
+
+        int subscriptionId = -1;
+        for (String line : headers) {
+            String[] parts = line.split(":");
+            if (parts[0].equals("id")) {
+                subscriptionId = Integer.parseInt(parts[1]);
+            }
+        }
+        String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
+        User user = (User) connections.getUsers().get(username);
+        String channel = (String) user.GetChannels().get(subscriptionId);
+        connections.removeSubscriber(channel, subscriptionId);
+        // TODO: sent a receipt frame
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n\u0000");
+        // TODO: sent an error frame
+    }
+
+    public void processDisconnect() {
+        // TODO: sent an error frame
+        int reciptId = -1;
+        String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
+        User user = (User) connections.getUsers().get(username);
+        connections.disconnect(this.connectionId);
+        for (String line : headers) {
+            String[] parts = line.split(":");
+            if (parts[0].equals("recipt")) {
+                reciptId = Integer.parseInt(parts[1]);
+            }
+        }
+        // TODO: sent a receipt frame
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n\u0000");
+    }
+
+    public void processSend() {
+        String dest = "";
+        String bodyMessage = "";
+        String message = "";
+
+        // construct the body messsage
+        for (String line : body) {
+            bodyMessage += line + "\n";
+        }
+
+        for (String line : headers) {
+            String[] parts = line.split(":");
+            if (parts[0].equals("destination")) {
+                dest = parts[1];
+            }
+        }
+        Map<Integer, User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest);
+        for (Map.Entry<Integer, User<String>> entry : usersToSend.entrySet()) {
+            message = "MESSAGE\nsubsription:" + entry.getKey() + "\nmessage-id:" + connections.getMessageID()
+                    + "\ndestination:" + dest + "\n\n" + bodyMessage + "\u0000";
+            connections.send(entry.getValue().GetConnectionId(), message);
+        }
+    }
+
+    /*
+     * public static void main(String[] args)
+     * {
+     * Frame f = new Frame(
+     * "CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il\nlogin:admin\npasscode:admin\n\nranivgiAluf\u0000"
+     * );
+     * System.out.println(f.getType().toString());
+     * System.out.println(f.getHeader().toString());
+     * System.out.println(f.getBody().toString());
+     * }
+     */
+}
