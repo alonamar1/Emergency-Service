@@ -81,4 +81,18 @@ public class User<T> {
     public void removeSubscriptionIdInChannel(int subscriptionId) {
         this.channels.remove(subscriptionId);
     }
+
+    /**
+     * Get the id of the subscription in the channel
+     * @param channel
+     * @return
+     */
+    public int getIdSubscription(String channel) {
+        for (Map.Entry<Integer, String> entry : channels.entrySet()) {
+            if (entry.getValue().equals(channel)) {
+                return entry.getKey();
+            }
+        }
+        return -1;
+    }
 }

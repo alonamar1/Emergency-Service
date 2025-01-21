@@ -11,8 +11,6 @@ public class StompServer {
         // TODO: implement this
 
         // you can use any server...
-        String str = "\u0000";
-        System.out.println("String with \\u0000: " + str);
         Server.threadPerClient(
                 7777, // port
                 () -> new StompMessagingProtocolImp(), // protocol factory

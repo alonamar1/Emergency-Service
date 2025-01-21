@@ -121,7 +121,7 @@ public class Frame {
         System.out.println(username + " CONNECTED");
         user.Connect(this.connectionId, connections.GetConnectionHandler(this.connectionId));
 
-        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\n" + "\\u0000");
+        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\n");
     }
 
     public void processSubsribe() {
@@ -140,7 +140,7 @@ public class Frame {
         System.out.println( username + " SUBSCRIBE to " + destination + " with id " + subscriptionId);
         connections.addSubscriber(destination, subscriptionId, connections.getUserByName(username));
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n" + "\\u0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n");
     }
 
     public void processUnsubsribe() {
@@ -158,7 +158,7 @@ public class Frame {
         System.out.println(username + " UNSUBSCRIBE from " + channel + " with id " + Integer.toString(subscriptionId));
         connections.removeSubscriber(channel, subscriptionId);
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n" + "\\u0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n");
         // TODO: sent an error frame
     }
 
@@ -173,7 +173,7 @@ public class Frame {
             }
         }
         // Send the message
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n" + "\\u0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n");
         // Then disconnect the user
         connections.disconnect(this.connectionId);
         System.out.println(username + " DISCONNECTED with recipt " + reciptId);
@@ -195,12 +195,13 @@ public class Frame {
                 dest = parts[1];
             }
         }
-        Map<Integer, User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
+        // TODO: need to delete the sunstring function -  באמת לא צריך אותה
+        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
         System.out.println("SEND to " + dest);
-        for (Map.Entry<Integer, User<String>> entry : usersToSend.entrySet()) {
-            message = "MESSAGE\nsubsription:" + entry.getKey() + "\nmessage-id:" + connections.getMessageID()
-                    + "\ndestination:" + dest + "\n\n" + bodyMessage + "\\u0000";
-            connections.send(entry.getValue().GetConnectionId(), message);
+        for (User<String> user : usersToSend) {
+            message = "MESSAGE\nsubsription:" + user.getIdSubscription(dest) + "\nmessage-id:" + connections.getMessageID()
+                    + "\ndestination:" + dest + "\n\n" + bodyMessage;
+            connections.send(user.GetConnectionId(), message);
         }
     }
 

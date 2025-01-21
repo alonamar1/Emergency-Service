@@ -3,7 +3,9 @@ package bgu.spl.net.srv;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import bgu.spl.net.impl.stomp.User;
@@ -19,7 +21,9 @@ public class ConnectionsImpl implements Connections<String> {
     private Map<Integer, ConnectionHandler<String>> connectionIdToconnectionHandler; // ConnectionHandler ->
                                                                                      // connectionId
     private Map<Integer, String> connectionIdToUsername; // connectionId -> username
-    private Map<String, Map<Integer, User<String>>> channelsSubscribers; // channel -> SubscriptionId -> Users
+    //private Map<String, Map<Integer, User<String>>> channelsSubscribers; // channel -> SubscriptionId -> Users
+    // channel -> list of connected Users that subscribe to the channel
+    private Map<String, List<User<String>>> channelsSubscribers; 
     private AtomicInteger messageId;
 
     // TODO: server type
@@ -52,10 +56,10 @@ public class ConnectionsImpl implements Connections<String> {
     @Override
     public void send(String channel, String msg) {
         synchronized (channelsSubscribers) {
-            Map<Integer, User<String>> subscribers = channelsSubscribers.get(channel);
+            List<User<String>> subscribers = channelsSubscribers.get(channel);
             if (subscribers != null) {
-                for (Map.Entry<Integer, User<String>> entry : subscribers.entrySet()) {
-                    this.send(entry.getValue().GetConnectionId(), msg);
+                for (User<String> user : subscribers) {
+                    this.send(user.GetConnectionId(), msg);
                 }
             }
         }
@@ -64,9 +68,10 @@ public class ConnectionsImpl implements Connections<String> {
     @Override
     public synchronized void disconnect(int connectionId) {
         User<String> user = this.getUser(connectionId);
+        // remove the user from all the channels is subscribe to
         Map<Integer, String> usersChannels = user.GetChannels();
         for (Map.Entry<Integer, String> entry : usersChannels.entrySet()) {
-            channelsSubscribers.get(entry.getValue()).remove(entry.getKey());
+            channelsSubscribers.get(entry.getValue()).remove(user);
         }
         // disconnect the user
         user.Disconnect();
@@ -111,19 +116,19 @@ public class ConnectionsImpl implements Connections<String> {
         return userDataBase.getUsers();
     }
 
-    public Map<String, Map<Integer, User<String>>> getChannelsSubscribers() {
+    public Map<String, List<User<String>>> getChannelsSubscribers() {
         return channelsSubscribers;
     }
 
     public void addSubscriber(String channel, int subscriptionId, User<String> user) {
         synchronized (channelsSubscribers) {
             if (!channelsSubscribers.containsKey(channel)) {
-                channelsSubscribers.put(channel, new ConcurrentHashMap<>());
+                channelsSubscribers.put(channel, new CopyOnWriteArrayList<>());
             }
             // add the subscription id to the user
             user.addSubscriptionIdInChannel(channel, subscriptionId);
             // add the user to the channel
-            channelsSubscribers.get(channel).put(subscriptionId, user);
+            channelsSubscribers.get(channel).add(user);
         }
     }
 
