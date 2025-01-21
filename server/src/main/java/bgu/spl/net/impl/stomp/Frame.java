@@ -171,6 +171,7 @@ public class Frame {
      */
     public void processSubsribe() {
         // TODO: error if there is no dest\id, handle in the client side!
+        // TODO: handle the case where the client sent dest as " " or ""
         int subscriptionId = -1;
         String destination = "";
         int reciptId = -1;
