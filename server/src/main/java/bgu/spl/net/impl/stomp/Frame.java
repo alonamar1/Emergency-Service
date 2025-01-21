@@ -66,6 +66,7 @@ public class Frame {
                 processDisconnect();
                 break;
             default:
+                //TODO: what is the process here?
                 throw new AssertionError("UNVALID FRAME TYPE");
         }
     }
@@ -97,7 +98,7 @@ public class Frame {
         exits = connections.getUsers().containsKey(username);
         // check if the user is exits
         if (exits) {
-            user = (User<String>) connections.getUsers().get(username);
+            user = connections.getUserByName(username);
             connected = user.IsConnected();
 
             // if the user allready connected or the password is wrong sent an error frame
@@ -107,6 +108,9 @@ public class Frame {
             if (!user.CheckPassword(password)) {
                 // TODO: sent an error frame
             }
+            
+            user.Connect(connectionId, connections.GetConnectionHandler(connectionId));
+            connections.addUserConnections(connectionId, username, user);
         }
 
         if (!exits) {
@@ -132,9 +136,9 @@ public class Frame {
                 subscriptionId = Integer.parseInt(parts[1]);
             }
         }
-        String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
+        String username = connections.getConnectionIdToUsernam().get(connectionId);
         System.out.println( username + " SUBSCRIBE to " + destination + " with id " + subscriptionId);
-        connections.addSubscriber(destination, subscriptionId, connections.getUsers().get(username));
+        connections.addSubscriber(destination, subscriptionId, connections.getUserByName(username));
         // TODO: sent a receipt frame
         connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n" + "\\u0000");
     }

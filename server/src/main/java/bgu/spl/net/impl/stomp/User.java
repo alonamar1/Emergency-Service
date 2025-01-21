@@ -41,6 +41,7 @@ public class User<T> {
         this.isConnected = false;
         this.connectionId = -1;
         this.connectionHandler = null;
+        channels.clear();
     }
 
     public boolean IsConnected() {

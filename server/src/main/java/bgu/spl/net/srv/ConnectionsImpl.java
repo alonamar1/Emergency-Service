@@ -63,7 +63,7 @@ public class ConnectionsImpl implements Connections<String> {
 
     @Override
     public synchronized void disconnect(int connectionId) {
-        User<String> user = userDataBase.getUser(connectionIdToUsername.get(connectionId));
+        User<String> user = this.getUser(connectionId);
         Map<Integer, String> usersChannels = user.GetChannels();
         for (Map.Entry<Integer, String> entry : usersChannels.entrySet()) {
             channelsSubscribers.get(entry.getValue()).remove(entry.getKey());
@@ -143,6 +143,10 @@ public class ConnectionsImpl implements Connections<String> {
         synchronized (connectionIdToUsername) {
             return userDataBase.getUser(connectionIdToUsername.get(connectionId));
         }
+    }
+
+    public User<String> getUserByName(String username) {
+        return userDataBase.getUser(username);
     }
 
 }
