@@ -13,7 +13,7 @@ public class Frame {
     private List<String> headers;
     private List<String> body;
     private String type;
-    private ConnectionsImpl<String> connections;
+    private ConnectionsImpl connections;
     private int connectionId;
 
     public Frame(String message, ConnectionsImpl connection, int conID) {
@@ -48,6 +48,7 @@ public class Frame {
     }
 
     public void process() {
+        // TODO: add recipt header to all the frames
         switch (this.type) {
             case "CONNECT":
                 processConnect();
@@ -58,7 +59,7 @@ public class Frame {
             case "SUBSCRIBE":
                 processSubsribe();
                 break;
-            case "UNSUBSRICE":
+            case "UNSUBSCRIBE":
                 processUnsubsribe();
                 break;
             case "DISCONNECT":
@@ -113,10 +114,10 @@ public class Frame {
                     connections.GetConnectionHandler(this.connectionId));
             connections.addUserConnections(this.connectionId, username, user);
         }
-
+        System.out.println(username + " CONNECTED");
         user.Connect(this.connectionId, connections.GetConnectionHandler(this.connectionId));
 
-        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\nu0000");
+        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\n" + "\\u0000");
     }
 
     public void processSubsribe() {
@@ -132,14 +133,13 @@ public class Frame {
             }
         }
         String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
-        connections.addSubscriber(destination, subscriptionId, (User) connections.getUsers().get(username));
+        System.out.println( username + " SUBSCRIBE to " + destination + " with id " + subscriptionId);
+        connections.addSubscriber(destination, subscriptionId, connections.getUsers().get(username));
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\nu0000");
-
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n" + "\\u0000");
     }
 
     public void processUnsubsribe() {
-
         int subscriptionId = -1;
         for (String line : headers) {
             String[] parts = line.split(":");
@@ -148,11 +148,13 @@ public class Frame {
             }
         }
         String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
-        User user = (User) connections.getUsers().get(username);
-        String channel = (String) user.GetChannels().get(subscriptionId);
+        
+        User<String> user = connections.getUsers().get(username);
+        String channel = user.GetChannels().get(subscriptionId);
+        System.out.println(username + " UNSUBSCRIBE from " + channel + " with id " + Integer.toString(subscriptionId));
         connections.removeSubscriber(channel, subscriptionId);
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\nu0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n" + "\\u0000");
         // TODO: sent an error frame
     }
 
@@ -160,16 +162,17 @@ public class Frame {
         // TODO: sent an error frame
         int reciptId = -1;
         String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
-        User user = (User) connections.getUsers().get(username);
-        connections.disconnect(this.connectionId);
         for (String line : headers) {
             String[] parts = line.split(":");
-            if (parts[0].equals("recipt")) {
+            if (parts[0].equals("receipt")) {
                 reciptId = Integer.parseInt(parts[1]);
             }
         }
-        // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\nu0000");
+        // Send the message
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n" + "\\u0000");
+        // Then disconnect the user
+        connections.disconnect(this.connectionId);
+        System.out.println(username + " DISCONNECTED with recipt " + reciptId);
     }
 
     public void processSend() {
@@ -189,9 +192,10 @@ public class Frame {
             }
         }
         Map<Integer, User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
+        System.out.println("SEND to " + dest);
         for (Map.Entry<Integer, User<String>> entry : usersToSend.entrySet()) {
             message = "MESSAGE\nsubsription:" + entry.getKey() + "\nmessage-id:" + connections.getMessageID()
-                    + "\ndestination:" + dest + "\n\n" + bodyMessage + "u0000";
+                    + "\ndestination:" + dest + "\n\n" + bodyMessage + "\\u0000";
             connections.send(entry.getValue().GetConnectionId(), message);
         }
     }

@@ -33,7 +33,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
             out = new BufferedOutputStream(sock.getOutputStream());
 
             // initialize the protocol
-            protocol.start(this.connectionId, ConnectionsImpl.getInstance());
+            protocol.start(this.connectionId, (Connections<T>) ConnectionsImpl.getInstance());
             
             // add this connection to the connections
             ConnectionsImpl.getInstance().addConnectionHandler(this.connectionId, this);
@@ -64,6 +64,7 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 
     @Override
     public void send(T msg) {
+        // send the message in Thread per client protocol
         try {
             if (msg != null) {
                 out.write(encdec.encode(msg));

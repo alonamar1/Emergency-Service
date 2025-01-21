@@ -16,7 +16,7 @@ public class ConnectionsImpl implements Connections<String> {
     }
 
     private UserDataBase userDataBase; // hold all users, active and none active
-    private Map<Integer, ConnectionHandler<String>> connectionHandlerToConnectionId; // ConnectionHandler ->
+    private Map<Integer, ConnectionHandler<String>> connectionIdToconnectionHandler; // ConnectionHandler ->
                                                                                      // connectionId
     private Map<Integer, String> connectionIdToUsername; // connectionId -> username
     private Map<String, Map<Integer, User<String>>> channelsSubscribers; // channel -> SubscriptionId -> Users
@@ -27,7 +27,7 @@ public class ConnectionsImpl implements Connections<String> {
     private ConnectionsImpl() {
         this.channelsSubscribers = new ConcurrentHashMap<>();
         this.connectionIdToUsername = new ConcurrentHashMap<>();
-        this.connectionHandlerToConnectionId = new ConcurrentHashMap<>();
+        this.connectionIdToconnectionHandler = new ConcurrentHashMap<>();
         this.userDataBase = UserDataBase.getInstance();
         this.messageId = new AtomicInteger(1);
     }
@@ -38,8 +38,8 @@ public class ConnectionsImpl implements Connections<String> {
 
     @Override
     public boolean send(int connectionId, String msg) {
-        synchronized (connectionHandlerToConnectionId) {
-            ConnectionHandler<String> handler = connectionHandlerToConnectionId.get(connectionId);
+        synchronized (connectionIdToconnectionHandler) {
+            ConnectionHandler<String> handler = connectionIdToconnectionHandler.get(connectionId);
             if (handler == null) {
                 return false;
             }
@@ -73,12 +73,12 @@ public class ConnectionsImpl implements Connections<String> {
         // delete from id to username
         connectionIdToUsername.remove(connectionId);
         // delete from the id to connection handler
-        connectionHandlerToConnectionId.remove(connectionId);
+        connectionIdToconnectionHandler.remove(connectionId);
 
     }
 
-    public void addConnectionHandler(int connectionId, ConnectionHandler<String> handler) {
-        this.connectionHandlerToConnectionId.put(connectionId, handler);
+    public void addConnectionHandler(int connectionId, ConnectionHandler handler) {
+        this.connectionIdToconnectionHandler.put(connectionId, handler);
     }
 
     /**
@@ -100,7 +100,7 @@ public class ConnectionsImpl implements Connections<String> {
      * @return
      */
     public ConnectionHandler<String> GetConnectionHandler(int connectionId) {
-        return this.connectionHandlerToConnectionId.get(connectionId);
+        return this.connectionIdToconnectionHandler.get(connectionId);
     }
 
     public int getMessageID() {
@@ -120,6 +120,9 @@ public class ConnectionsImpl implements Connections<String> {
             if (!channelsSubscribers.containsKey(channel)) {
                 channelsSubscribers.put(channel, new ConcurrentHashMap<>());
             }
+            // add the subscription id to the user
+            user.addSubscriptionIdInChannel(channel, subscriptionId);
+            // add the user to the channel
             channelsSubscribers.get(channel).put(subscriptionId, user);
         }
     }
