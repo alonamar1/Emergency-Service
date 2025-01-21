@@ -154,4 +154,8 @@ public class ConnectionsImpl implements Connections<String> {
         return userDataBase.getUser(username);
     }
 
+    public Map<Integer, ConnectionHandler<String>> getconnectionIdToconnectionHandler() {
+        return connectionIdToconnectionHandler;
+    }
+
 }
