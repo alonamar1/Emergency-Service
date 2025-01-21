@@ -15,15 +15,14 @@ public class Frame {
     private String type;
     private ConnectionsImpl<String> connections;
     private int connectionId;
-    private ConnectionHandler<String> connectionHandler;
 
-    public Frame(String message, ConnectionsImpl connection, int conID, ConnectionHandler<String> connectionHandler) {
+    public Frame(String message, ConnectionsImpl connection, int conID) {
         headers = new LinkedList<>();
         body = new LinkedList<>();
         String[] lines = message.split("\n");
         this.type = lines[0];
         int i = 1;
-        while (!lines[i].equals("")) {
+        while (i < lines.length && !lines[i].equals("")) {
             this.headers.add(lines[i]);
             i++;
         }
@@ -34,7 +33,6 @@ public class Frame {
         }
         this.connections = connection;
         this.connectionId = conID;
-        this.connectionHandler = connectionHandler;
     }
 
     public List<String> getHeader() {
@@ -53,23 +51,33 @@ public class Frame {
         switch (this.type) {
             case "CONNECT":
                 processConnect();
+                break;
             case "SEND":
                 processSend();
+                break;
             case "SUBSCRIBE":
                 processSubsribe();
+                break;
             case "UNSUBSRICE":
                 processUnsubsribe();
+                break;
             case "DISCONNECT":
                 processDisconnect();
+                break;
             default:
                 throw new AssertionError("UNVALID FRAME TYPE");
         }
     }
 
     public void processConnect() {
+        boolean exits = false;
+        boolean connected = false;
+        String username = "";
+        String password = "";
+        User<String> user = null;
+
         for (String line : headers) {
             String[] parts = line.split(":");
-            User user = (User) (connections).getUsers().get(parts[1]);
             if (parts[0].equals("accept-version")) {
                 if (!parts[1].equals("1.2")) {
                     // TODO: sent an error frame
@@ -79,21 +87,36 @@ public class Frame {
                     // TODO: sent an error frame
                 }
             } else if (parts[0].equals("login")) {
+                username = parts[1];
 
-                if (user.IsConnected()) {
-                    // TODO: sent an error frame
-                }
-                if (!user.CheckUsername(parts[1])) {
-                    // TODO: sent an error frame
-                }
-                user.Connect(this.connectionId, connectionHandler);
             } else if (parts[0].equals("passcode")) {
-                if (!user.CheckPassword(parts[1])) {
-                    // TODO: sent an error frame
-                }
+                password = parts[1];
             }
         }
-        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\n\u0000");
+        exits = connections.getUsers().containsKey(username);
+        // check if the user is exits
+        if (exits) {
+            user = (User<String>) connections.getUsers().get(username);
+            connected = user.IsConnected();
+
+            // if the user allready connected or the password is wrong sent an error frame
+            if (connected) {
+                // TODO: sent an error frame
+            }
+            if (!user.CheckPassword(password)) {
+                // TODO: sent an error frame
+            }
+        }
+
+        if (!exits) {
+            user = new User<String>(username, password, this.connectionId,
+                    connections.GetConnectionHandler(this.connectionId));
+            connections.addUserConnections(this.connectionId, username, user);
+        }
+
+        user.Connect(this.connectionId, connections.GetConnectionHandler(this.connectionId));
+
+        connections.send(this.connectionId, "CONNECTED\nversion:1.2\n\nu0000");
     }
 
     public void processSubsribe() {
@@ -111,7 +134,7 @@ public class Frame {
         String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
         connections.addSubscriber(destination, subscriptionId, (User) connections.getUsers().get(username));
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n\u0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\nu0000");
 
     }
 
@@ -129,7 +152,7 @@ public class Frame {
         String channel = (String) user.GetChannels().get(subscriptionId);
         connections.removeSubscriber(channel, subscriptionId);
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n\u0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\nu0000");
         // TODO: sent an error frame
     }
 
@@ -146,7 +169,7 @@ public class Frame {
             }
         }
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n\u0000");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\nu0000");
     }
 
     public void processSend() {
@@ -165,23 +188,21 @@ public class Frame {
                 dest = parts[1];
             }
         }
-        Map<Integer, User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest);
+        Map<Integer, User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
         for (Map.Entry<Integer, User<String>> entry : usersToSend.entrySet()) {
             message = "MESSAGE\nsubsription:" + entry.getKey() + "\nmessage-id:" + connections.getMessageID()
-                    + "\ndestination:" + dest + "\n\n" + bodyMessage + "\u0000";
+                    + "\ndestination:" + dest + "\n\n" + bodyMessage + "u0000";
             connections.send(entry.getValue().GetConnectionId(), message);
         }
     }
 
-    /*
-     * public static void main(String[] args)
-     * {
-     * Frame f = new Frame(
-     * "CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il\nlogin:admin\npasscode:admin\n\nranivgiAluf\u0000"
-     * );
-     * System.out.println(f.getType().toString());
-     * System.out.println(f.getHeader().toString());
-     * System.out.println(f.getBody().toString());
-     * }
-     */
+    // public static void main(String[] args) {
+    // Frame f = new
+    // Frame("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il\nlogin:admin\npasscode:admin\n\nranivgiAluf\u0000",
+    // null, 1);
+    // System.out.println(f.getType().toString());
+    // System.out.println(f.getHeader().toString());
+    // System.out.println(f.getBody().toString());
+    // }
+
 }

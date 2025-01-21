@@ -3,112 +3,143 @@ package bgu.spl.net.srv;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import bgu.spl.net.impl.stomp.User;
+import bgu.spl.net.impl.stomp.UserDataBase;
 
-public class ConnectionsImpl<T> implements Connections<T> {
+public class ConnectionsImpl implements Connections<String> {
 
-    private static ConnectionsImpl instance = null;
-
-    private Map<Integer, String> connectionIdToUsername; // connectionId -> username
-
-    private Map<String , User<T>> users; // username -> User
-
-    private Map<String, Map<Integer,User<T>>> channelsSubscribers; // channel -> SubscriptionId -> Users
-
-    private int messageId;
-
-    // TODO: האם צריך להוסיף רשימה של ID ולאיזה צ'אנל הוא רשום
-    // TODO: לסנכרן ולהפוך threadsafe
-    // TODO: server type
-    
-    private ConnectionsImpl() {
-        this.users = new HashMap<>();
-        this.channelsSubscribers = new HashMap<>();
-        this.connectionIdToUsername = new HashMap<>();
-        this.messageId = 1;
+    private static class ConnectionHandlerHolder {
+        private static ConnectionsImpl instance = new ConnectionsImpl();
     }
 
-    public static synchronized ConnectionsImpl getInstance() {
-        if (instance == null) {
-            instance = new ConnectionsImpl();
-        }
-        return instance;
+    private UserDataBase userDataBase; // hold all users, active and none active
+    private Map<Integer, ConnectionHandler<String>> connectionHandlerToConnectionId; // ConnectionHandler ->
+                                                                                     // connectionId
+    private Map<Integer, String> connectionIdToUsername; // connectionId -> username
+    private Map<String, Map<Integer, User<String>>> channelsSubscribers; // channel -> SubscriptionId -> Users
+    private AtomicInteger messageId;
+
+    // TODO: server type
+
+    private ConnectionsImpl() {
+        this.channelsSubscribers = new ConcurrentHashMap<>();
+        this.connectionIdToUsername = new ConcurrentHashMap<>();
+        this.connectionHandlerToConnectionId = new ConcurrentHashMap<>();
+        this.userDataBase = UserDataBase.getInstance();
+        this.messageId = new AtomicInteger(1);
+    }
+
+    public static ConnectionsImpl getInstance() {
+        return ConnectionHandlerHolder.instance;
     }
 
     @Override
-    public boolean send(int connectionId, T msg) {
-        if (users.containsKey(connectionIdToUsername.get(connectionId))) {
-            users.get(connectionIdToUsername.get(connectionId)).GetConnectionHandler().send(msg);
-            this.messageId++;
+    public boolean send(int connectionId, String msg) {
+        synchronized (connectionHandlerToConnectionId) {
+            ConnectionHandler<String> handler = connectionHandlerToConnectionId.get(connectionId);
+            if (handler == null) {
+                return false;
+            }
+            handler.send(msg);
+            this.messageId.incrementAndGet();
             return true;
         }
-        return false;
     }
 
     @Override
-    public void send(String channel, T msg) {
-        if (channelsSubscribers.containsKey(channel)) {
-            Map<Integer, User<T>> subscribers = channelsSubscribers.get(channel);
-            for (int connectionId : subscribers.keySet()) {
-                send(connectionId, msg);
+    public void send(String channel, String msg) {
+        synchronized (channelsSubscribers) {
+            Map<Integer, User<String>> subscribers = channelsSubscribers.get(channel);
+            if (subscribers != null) {
+                for (Map.Entry<Integer, User<String>> entry : subscribers.entrySet()) {
+                    this.send(entry.getValue().GetConnectionId(), msg);
+                }
             }
         }
     }
 
     @Override
-    public void disconnect(int connectionId) {
-        User user = users.get(connectionIdToUsername.get(connectionId));
-        Map<Integer, String>  usersChannels = user.GetChannels();
-        for (Map.Entry<Integer, String> entry : usersChannels.entrySet())
-        {
+    public synchronized void disconnect(int connectionId) {
+        User<String> user = userDataBase.getUser(connectionIdToUsername.get(connectionId));
+        Map<Integer, String> usersChannels = user.GetChannels();
+        for (Map.Entry<Integer, String> entry : usersChannels.entrySet()) {
             channelsSubscribers.get(entry.getValue()).remove(entry.getKey());
         }
+        // disconnect the user
         user.Disconnect();
-        users.remove(connectionIdToUsername.get(connectionId));
-        
+        // delete from id to username
+        connectionIdToUsername.remove(connectionId);
+        // delete from the id to connection handler
+        connectionHandlerToConnectionId.remove(connectionId);
+
     }
 
-    public int getMessageID()
-    {
-        return this.messageId;
+    public void addConnectionHandler(int connectionId, ConnectionHandler<String> handler) {
+        this.connectionHandlerToConnectionId.put(connectionId, handler);
     }
 
-    public Map<String , User<T>> getUsers()
-    {
-        return users;
+    /**
+     * add user to the system
+     * 
+     * @param connectid
+     * @param username
+     * @param user
+     */
+    public void addUserConnections(int connectid, String username, User<String> user) {
+        userDataBase.addUser(username, user);
+        connectionIdToUsername.put(connectid, username);
     }
 
-    public Map<String, Map<Integer,User<T>>> getChannelsSubscribers()
-    {
+    /**
+     * get the connection handler by the connection id
+     * 
+     * @param connectionId
+     * @return
+     */
+    public ConnectionHandler<String> GetConnectionHandler(int connectionId) {
+        return this.connectionHandlerToConnectionId.get(connectionId);
+    }
+
+    public int getMessageID() {
+        return this.messageId.get();
+    }
+
+    public Map<String, User<String>> getUsers() {
+        return userDataBase.getUsers();
+    }
+
+    public Map<String, Map<Integer, User<String>>> getChannelsSubscribers() {
         return channelsSubscribers;
     }
 
-    public void addSubscriber(String channel, int subscriptionId, User<T> user)
-    {
-        if (!channelsSubscribers.containsKey(channel))
-        {
-            channelsSubscribers.put(channel, new HashMap<>());
+    public void addSubscriber(String channel, int subscriptionId, User<String> user) {
+        synchronized (channelsSubscribers) {
+            if (!channelsSubscribers.containsKey(channel)) {
+                channelsSubscribers.put(channel, new ConcurrentHashMap<>());
+            }
+            channelsSubscribers.get(channel).put(subscriptionId, user);
         }
-        channelsSubscribers.get(channel).put(subscriptionId, user);
     }
 
-    public Map<Integer, String> getConnectionIdToUsernam()
-    {
+    public Map<Integer, String> getConnectionIdToUsernam() {
         return connectionIdToUsername;
     }
 
-    public void removeSubscriber(String channel, int subscriptionId)
-    {
-        if (channelsSubscribers.containsKey(channel))
-        {
-            channelsSubscribers.get(channel).remove(subscriptionId);
+    public void removeSubscriber(String channel, int subscriptionId) {
+        synchronized (channelsSubscribers) {
+            if (channelsSubscribers.containsKey(channel)) {
+                channelsSubscribers.get(channel).remove(subscriptionId);
+            }
         }
     }
 
-    public User<T> getUser(int connectionId)
-    {
-        return users.get(connectionIdToUsername.get(connectionId));
+    public User<String> getUser(int connectionId) {
+        synchronized (connectionIdToUsername) {
+            return userDataBase.getUser(connectionIdToUsername.get(connectionId));
+        }
     }
 
 }

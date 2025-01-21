@@ -14,13 +14,13 @@ public class User<T> {
     private Map<Integer, String> channels;
     private ConnectionHandler<T> connectionHandler;
 
-    public User(String username, String password) {
+    public User(String username, String password, int connectionId, ConnectionHandler<T> connectionHandler) {
         this.username = username;
         this.password = password;
-        this.isConnected = false;
-        this.connectionId = -1;
+        this.isConnected = true;
+        this.connectionId = connectionId;
         this.channels = new HashMap<>();
-        this.connectionHandler = null;
+        this.connectionHandler = connectionHandler;
     }
 
     public boolean CheckUsername(String username) {

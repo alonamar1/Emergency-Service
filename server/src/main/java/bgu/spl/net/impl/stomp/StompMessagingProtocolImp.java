@@ -19,8 +19,8 @@ public class StompMessagingProtocolImp implements StompMessagingProtocol<String>
 
     @Override
     public void process(String message) {
-        User<String> user = ((ConnectionsImpl<String>) connections).getUser(connectionId);
-        Frame frame = new Frame(message, (ConnectionsImpl<String>) connections, connectionId, user.GetConnectionHandler());
+        // TODO: fix the first user connect frame
+        Frame frame = new Frame(message, (ConnectionsImpl<String>) connections, connectionId);
         frame.process();
     }
 
