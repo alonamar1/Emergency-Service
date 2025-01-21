@@ -51,7 +51,6 @@ public class Frame {
      * process the Message
      */
     public void process() {
-        // TODO: add recipt header to all the frames
         switch (this.type) {
             case "CONNECT":
                 processConnect();
@@ -69,8 +68,13 @@ public class Frame {
                 processDisconnect();
                 break;
             default:
-                // TODO: what is the process here?
-                throw new AssertionError("UNVALID FRAME TYPE");
+                String errorMesg = createErrorMessage(this.type + "\n\n", "Unknown frame type", -1, null);
+                // close the socket in ConnectionHandler and send meesage to the user
+                this.handleErrorSendAndDisconnect(errorMesg);
+                // remove the connection handle from the connections
+                connections.getconnectionIdToconnectionHandler().remove(this.connectionId);
+                // Stop the function
+                return;
         }
     }
 
@@ -208,8 +212,7 @@ public class Frame {
             String[] parts = line.split(":");
             if (parts[0].equals("id")) {
                 subscriptionId = Integer.parseInt(parts[1]);
-            }
-            else if (parts[0].equals("receipt")) {
+            } else if (parts[0].equals("receipt")) {
                 reciptId = Integer.parseInt(parts[1]);
             }
         }
@@ -274,8 +277,7 @@ public class Frame {
             String[] parts = line.split(":");
             if (parts[0].equals("destination")) {
                 dest = parts[1];
-            }
-            else if (parts[0].equals("receipt")) {
+            } else if (parts[0].equals("receipt")) {
                 reciptId = Integer.parseInt(parts[1]);
             }
         }
