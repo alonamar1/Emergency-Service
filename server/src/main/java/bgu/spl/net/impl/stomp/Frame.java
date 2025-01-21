@@ -315,7 +315,8 @@ public class Frame {
         }
         System.out.println("SEND to " + dest);
         // Send confirmation message
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n");
+        // TODO: there is a chance that this line give us bugs with the client they gave us
+        // connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n");
     }
 
     /**
