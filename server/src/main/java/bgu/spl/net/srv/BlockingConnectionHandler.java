@@ -48,6 +48,10 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
                     // }
                 }
             }
+            // if the user is still connected for somne reason, the socket close unexpected, disconnect him
+            if (ConnectionsImpl.getInstance().getUser(this.connectionId).IsConnected()) {
+                ConnectionsImpl.getInstance().disconnect(this.connectionId);
+            }
             this.close();
 
         } catch (IOException ex) {
