@@ -66,7 +66,7 @@ public class Frame {
                 processDisconnect();
                 break;
             default:
-                //TODO: what is the process here?
+                // TODO: what is the process here?
                 throw new AssertionError("UNVALID FRAME TYPE");
         }
     }
@@ -108,7 +108,7 @@ public class Frame {
             if (!user.CheckPassword(password)) {
                 // TODO: sent an error frame
             }
-            
+
             user.Connect(connectionId, connections.GetConnectionHandler(connectionId));
             connections.addUserConnections(connectionId, username, user);
         }
@@ -128,37 +128,48 @@ public class Frame {
         // TODO: sent an error frame
         int subscriptionId = -1;
         String destination = "";
+        int reciptId = -1;
         for (String line : headers) {
             String[] parts = line.split(":");
             if (parts[0].equals("destination")) {
                 destination = parts[1];
-            } else if (parts[0].equals("id")) {
+            }
+            if (parts[0].equals("id")) {
                 subscriptionId = Integer.parseInt(parts[1]);
+            }
+            if (parts[0].equals("receipt")) {
+                reciptId = Integer.parseInt(parts[1]);
             }
         }
         String username = connections.getConnectionIdToUsernam().get(connectionId);
-        System.out.println( username + " SUBSCRIBE to " + destination + " with id " + subscriptionId);
+        System.out.println(
+                username + " SUBSCRIBE to " + destination + " with id " + subscriptionId + " with recipt " + reciptId);
         connections.addSubscriber(destination, subscriptionId, connections.getUserByName(username));
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n");
     }
 
     public void processUnsubsribe() {
         int subscriptionId = -1;
+        int reciptId = -1;
         for (String line : headers) {
             String[] parts = line.split(":");
             if (parts[0].equals("id")) {
                 subscriptionId = Integer.parseInt(parts[1]);
             }
+            if (parts[0].equals("receipt")) {
+                reciptId = Integer.parseInt(parts[1]);
+            }
         }
         String username = (String) connections.getConnectionIdToUsernam().get(connectionId);
-        
+
         User<String> user = connections.getUsers().get(username);
         String channel = user.GetChannels().get(subscriptionId);
-        System.out.println(username + " UNSUBSCRIBE from " + channel + " with id " + Integer.toString(subscriptionId));
+        System.out.println(username + " UNSUBSCRIBE from " + channel + " with id " + Integer.toString(subscriptionId)
+                + " with recipt " + reciptId);
         connections.removeSubscriber(channel, subscriptionId);
         // TODO: sent a receipt frame
-        connections.send(this.connectionId, "RECEIPT\nreceipt-id:1\n\n");
+        connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n");
         // TODO: sent an error frame
     }
 
@@ -195,11 +206,12 @@ public class Frame {
                 dest = parts[1];
             }
         }
-        // TODO: need to delete the sunstring function -  באמת לא צריך אותה
+        // TODO: need to delete the sunstring function - באמת לא צריך אותה
         List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
         System.out.println("SEND to " + dest);
         for (User<String> user : usersToSend) {
-            message = "MESSAGE\nsubsription:" + user.getIdSubscription(dest) + "\nmessage-id:" + connections.getMessageID()
+            message = "MESSAGE\nsubsription:" + user.getIdSubscription(dest) + "\nmessage-id:"
+                    + connections.getMessageID()
                     + "\ndestination:" + dest + "\n\n" + bodyMessage;
             connections.send(user.GetConnectionId(), message);
         }
