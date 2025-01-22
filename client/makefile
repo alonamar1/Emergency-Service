@@ -1,31 +1,27 @@
-CFLAGS:=-c -Wall -Weffc++ -g -std=c++11 -Iinclude
-LDFLAGS:=-lboost_system -lpthread
-# TODO change the makefile for StompEMIlient
-all: runCheckClient 
+CFLAGS := -c -Wall -Weffc++ -g -std=c++11 -Iinclude
+LDFLAGS := -lboost_system -lpthread
 
-EchoClient: bin/ConnectionHandler.o bin/echoClient.o
-	g++ -o bin/EchoClient bin/ConnectionHandler.o bin/echoClient.o $(LDFLAGS)
+all: bin/StompClient.exe run
 
-StompWCIClient: bin/ConnectionHandler.o bin/StompClient.obin/event.o
-	g++ -o bin/StompWCIClient bin/ConnectionHandler.o bin/StompClient.o $(LDFLAGS)
+bin/StompClient.exe: bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o
+	g++ -o bin/StompClient bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o $(LDFLAGS)
 
 bin/ConnectionHandler.o: src/ConnectionHandler.cpp
 	g++ $(CFLAGS) -o bin/ConnectionHandler.o src/ConnectionHandler.cpp
 
-bin/echoClient.o: src/echoClient.cpp
-	g++ $(CFLAGS) -o bin/echoClient.o src/echoClient.cpp
+bin/StompClient.o: src/StompClient.cpp
+	g++ $(CFLAGS) -o bin/StompClient.o src/StompClient.cpp
 
 bin/event.o: src/event.cpp
 	g++ $(CFLAGS) -o bin/event.o src/event.cpp
 
-bin/StompClient.o: src/StompClient.cpp
-	g++ $(CFLAGS) -o bin/StompClient.o src/StompClient.cpp
+bin/dataBaseClient.o: src/dataBaseClient.cpp
+	g++ $(CFLAGS) -o bin/dataBaseClient.o src/dataBaseClient.cpp
 
-runCheckClient:
-	./bin/StompESClient
+run: bin/StompClient
+	./bin/StompClient 127.0.0.1 7777
 
 .PHONY: clean
 
 clean:
 	rm -f bin/*
-	

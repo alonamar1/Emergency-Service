@@ -62,7 +62,7 @@ std::string convertToStompFrame(const std::string &userInput)
         std::istringstream iss(userInput.substr(8)); 
         std::string channelName, userName, filePath;
         iss >> channelName >> userName >> filePath;
-        std::vector<Event> events = userMessages->get // להשלים מאיפה אני מביא את הevents
+        //std::vector<Event> events = userMessages->get // להשלים מאיפה אני מביא את הevents
         //sortEvents(events);
 
         //generateSummary(channelName, userName, filePath, events);

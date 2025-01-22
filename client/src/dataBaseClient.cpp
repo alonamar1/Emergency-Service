@@ -2,72 +2,37 @@
 #include <map>
 #include <vector>
 #include <string>
-#include "../include/event.h" 
+#include "../include/event.h"
+#include "../include/dataBaseClient.h"
 
-class ChannelEvents {
-public:
-    std::map<std::string, std::vector<Event>> eventsBySubject;
+void ChannelEvents::addEvent(const std::string &subject, const Event &content)
+{
+    eventsBySubject[subject].push_back(content);
+}
 
-    void addEvent(const std::string& subject, const Event& content) {
-        eventsBySubject[subject].emplace_back(subject, content);
-    }
+std::map<std::string, std::vector<Event>> ChannelEvents::getEvents()
+{
+    return eventsBySubject;
+}
 
-    /*void printMessages() const {
-        for (const auto& subjectMessages : messagesBySubject) {
-            std::cout << "Subject: " << subjectMessages.first << std::endl;
-            for (const auto& message : subjectMessages.second) {
-                std::cout << "  Content: " << message.content << std::endl;
-            }
-        }
-    }
-    */
-};
+DataBaseClient::DataBaseClient() : userMessages(std::map<std::string, ChannelEvents>()) {}
 
-class DataBaseClient {
-public:
-    std::map<std::string, ChannelEvents> userMessages;
+void DataBaseClient::addMessage(const std::string &user, const std::string &subject, const std::string &content)
+{
+    userMessages[user].addEvent(subject, content);
+}
 
-    DataBaseClient()
-    {
-        userMessages = std::map<std::string, ChannelEvents>();
-    }
+std::vector<Event> DataBaseClient::getEvents(const std::string &user, const std::string &subject)
+{
+    return userMessages[user].getEvents().at(subject);
+}
 
-    void addMessage(const std::string& user, const std::string& subject, const std::string& content) {
-        userMessages[user].addEvent(subject, content);
-    }
+void DataBaseClient::addReport(const std::string &user, const std::string &channel, const Event &event)
+{
+    userMessages[user].getEvents()[channel].push_back(event);
+}
 
-    std::vector<Event> getEvents(const std::string& user, const std::string& subject) {
-        return userMessages[user].eventsBySubject[subject];
-    }
-
-    void addReport(const std::string& user, const std::string& channel, const Event& event) {
-        userMessages[user].eventsBySubject[channel].push_back(event);
-    }
-
-    void deleteUser(const std::string& user) {
-        userMessages.erase(user);
-    }
-
-/*
-    void printAllMessages() const {
-        for (const auto& userMessage : userMessages) {
-            std::cout << "User: " << userMessage.first << std::endl;
-            userMessage.second.printMessages();
-        }
-    }
-    */
-};
-/*
-int main() {
-    DataBaseClient dbClient;
-
-    dbClient.addMessage("user1", "subject1", "Hello from user1 on subject1");
-    dbClient.addMessage("user1", "subject2", "Hello from user1 on subject2");
-    dbClient.addMessage("user2", "subject1", "Hello from user2 on subject1");
-
-    dbClient.printAllMessages();
-
-    return 0;
-}*/
-
-
+void DataBaseClient::deleteUser(const std::string &user)
+{
+    userMessages.erase(user);
+}
