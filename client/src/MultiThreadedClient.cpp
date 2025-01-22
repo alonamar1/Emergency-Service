@@ -2,21 +2,28 @@
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <string>
+#include <fstream>
+#include <iomanip>
+#include "../include/event.h" 
 #include "../include/ConnectionHandler.h"
+#include <string>
 
 // Mutex for thread synchronization
 std::mutex mtx;
 std::atomic<bool> stopThreads(false);
 int recipt = 1;
 
+
 // Convert user input to a STOMP frame
 std::string convertToStompFrame(const std::string &userInput)
 {
+    std::vector<std::string> frames;
     // Parse user input and create the appropriate STOMP frame
     std::string frame;
-    if (userInput.starts_with("login"))
+    if (starts_with(userInput, "login"))
     {
-        string parts = userInput.substr(6); // Remove "login "
+        std::string parts = userInput.substr(6); // Remove "login "
         size_t colonPos = parts.find(':');
         std::string host = parts.substr(0, colonPos);
         size_t spacePos = parts.find(' ', colonPos);
@@ -24,43 +31,41 @@ std::string convertToStompFrame(const std::string &userInput)
         std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
         std::string password = parts.substr(parts.find(' ', spacePos + 1) + 1);
 
-        frame = "CONNECT\naccept-version:1.2\nhost:" + host +                //?????????????????
-                "\nlogin:" + username + "\npasscode:" + password + "\n\n^@"; //?????????????????
+        frames.push_back("CONNECT\naccept-version:1.2\nhost:" + host +                //?????????????????
+                "\nlogin:" + username + "\npasscode:" + password + "\n\n^0"); //?????????????????
     }
-    else if (userInput.starts_with("join"))
+    else if (starts_with(userInput,"join"))
     {
         std::string channel = userInput.substr(5);
-        frame = "SUBSCRIBE\ndestination:/" + channel + "\nid:1\nreceipt:" + recipt + "\n\n^@"; //????????????????????
+        frames.push_back("SUBSCRIBE\ndestination:/" + channel + "\nid:1\nreceipt:" + std::to_string(recipt) + "\n\n^0"); //????????????????????
         recipt++;
     }
-    else if (userInput.starts_with("exit"))
+    else if (starts_with(userInput, "exit"))
     {
-        \ std::string channel = userInput.substr(5);
-        frame = "UNSUBSCRIBE\nid:1\nreceipt:" + recipt + "\n\n^@";
+        std::string channel = userInput.substr(5);
+        frames.push_back("UNSUBSCRIBE\nid:1\nreceipt:" + std::to_string(recipt) + "\n\n^0");
         recipt++;
     }
-    else if (userInput.starts_with("logout"))
+    else if (starts_with(userInput, "logout"))
     {
-        frame = "DISCONNECT\nreceipt:" + recipt + "\n\n^@";
+        frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n^0");
         recipt++;
     }
-    else if (userInput.starts_with("report")) //?????????????????????
+    else if (starts_with(userInput, "report")) //???????????????????????
     {
         std::string filePath = userInput.substr(7); // Skip "report "
-        std::vector<std::string> frames = jsonToEvents(filePath);
-        sortEvents(frames);
+        frames = jsonToEvent(filePath);
     }
 
-    else if (userInput.starts_with("summery")) //?????????????????????
+    else if (starts_with(userInput,"summery")) //?????????????????????
     {
         std::istringstream iss(userInput.substr(8)); // Skip "summary "
         std::string channelName, userName, filePath;
         iss >> channelName >> userName >> filePath;
-        std::ofstream outFile(filePath, std::ios::app);
-        std::vector<std::string> events = jsonToEvents(filePath); // להשלים מאיפה אני מביא את הevents
-        sortEvents(events);
+        //std::vector<std::string> events = jsonToEvent(filePath); // להשלים מאיפה אני מביא את הevents
+        //sortEvents(events);
 
-        generateSummary(channelName, userName, filePath, events);
+        //generateSummary(channelName, userName, filePath, events);
     }
 
     return frame;
@@ -83,7 +88,7 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
             stopThreads = true;
         }
 
-        if (userInput.starts_with("logout"))
+        if (starts_with(userInput, "logout"))
         {
             stopThreads = true;
         }
@@ -106,11 +111,11 @@ void readFromServer(ConnectionHandler &connectionHandler)
         std::lock_guard<std::mutex> lock(mtx);
         // Process server response
         std::cout << "Server: " << serverResponse << std::endl;
-        if (serverResponse.starts_with("RECEIPT"))
+        if (starts_with(serverResponse, "RECEIPT"))
         {
             std::cout << "Received acknowledgment from server.\n";
         }
-        else if (serverResponse.starts_with("ERROR"))
+        else if (starts_with(serverResponse, "ERROR"))
         {
             std::cerr << "Error received from server: " << serverResponse << std::endl;
         }
@@ -155,33 +160,33 @@ void sortEventsByTimeApoch(std::vector<Event> &events)
 // Comparator for sorting by date/time and lexicographically by name
 bool compareByDateAndName(const Event &a, const Event &b)
 {
-    if (a.get_date_time_string() == b.get_date_time_string())
+    if (a.get_date_time() == b.get_date_time())
     {
         // Secondary criterion: Lexicographical comparison by event name
         return a.get_name() < b.get_name();
     }
     // Primary criterion: Compare date_time strings lexicographically
-    return a.get_date_time_string() < b.get_date_time_string();
+    return a.get_date_time() < b.get_date_time();
 }
 
 // Sort events by date/time and name
 void sortEvents(std::vector<Event> &events)
 {
-    std::sort(0, event.get_date_time(), compareByDateAndName);
+    std::sort(events.begin(), events.end(), compareByDateAndName);
 }
 
-vector<string> jsonToEvent(string filepath)
+std::vector<std::string> jsonToEvent(std::string filepath)
 {
-    names_and_events parsedData = parseEventsFile(filePath);
+    names_and_events parsedData = parseEventsFile(filepath);
+    sortEvents(parsedData.events);
     std::vector<std::string> frames; // To store multiple frames for "report"
-
     // Create SEND frames for each event
     for (const Event &event : parsedData.events)
     {
         std::ostringstream sendFrame;
         sendFrame << "SEND\n"
                   << "destination:/" << event.get_channel_name() << "\n\n"
-                  << "user:" << event.getEventOwnerUser() + << "\n"
+                  << "user:" << event.getEventOwnerUser() << "\n"
                   << "city:" << event.get_city() << "\n"
                   << "event name:" << event.get_name() << "\n"
                   << "date time:" << event.get_date_time() << "\n"
@@ -192,10 +197,13 @@ vector<string> jsonToEvent(string filepath)
                   << "^@";
         frames.push_back(sendFrame.str());
     }
-
+    return frames;
+}
+    
     void generateSummary(const std::string &channelName, const std::string &userName,
                          const std::string &filePath, const std::vector<Event> &events)
     {
+        std::ofstream outFile(filePath, std::ios::app);
         if (!outFile)
         {
             std::cerr << "Failed to open file: " << filePath << std::endl;
@@ -251,6 +259,13 @@ vector<string> jsonToEvent(string filepath)
         outFile.close();
         std::cout << "Summary generated in file: " << filePath << std::endl;
     }
-}
+    bool starts_with(const std::string &source, const std::string &pre)
+    {
+        int spacePos = source.find(' ');
+        std::string start = source.substr(0, spacePos);
+        return start==pre;
+
+    }
+
 
 
