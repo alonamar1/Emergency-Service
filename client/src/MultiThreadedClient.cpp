@@ -51,18 +51,18 @@ std::string convertToStompFrame(const std::string &userInput)
         frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n^0");
         recipt++;
     }
-    else if (starts_with(userInput, "report")) //???????????????????????
+    else if (starts_with(userInput, "report")) 
     {
-        std::string filePath = userInput.substr(7); // Skip "report "
+        std::string filePath = userInput.substr(7); 
         frames = jsonToEvent(filePath);
     }
 
-    else if (starts_with(userInput,"summery")) //?????????????????????
+    else if (starts_with(userInput,"summery")) 
     {
-        std::istringstream iss(userInput.substr(8)); // Skip "summary "
+        std::istringstream iss(userInput.substr(8)); 
         std::string channelName, userName, filePath;
         iss >> channelName >> userName >> filePath;
-        //std::vector<std::string> events = jsonToEvent(filePath); // להשלים מאיפה אני מביא את הevents
+        std::vector<Event> events = userMessages->get // להשלים מאיפה אני מביא את הevents
         //sortEvents(events);
 
         //generateSummary(channelName, userName, filePath, events);

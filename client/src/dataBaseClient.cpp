@@ -36,12 +36,16 @@ public:
         userMessages[user].addEvent(subject, content);
     }
 
-    void addUser(const std::string& user) {
-        userMessages[user] = ChannelEvents();
-    }
-
     std::vector<Event> getEvents(const std::string& user, const std::string& subject) {
         return userMessages[user].eventsBySubject[subject];
+    }
+
+    void addReport(const std::string& user, const std::string& channel, const Event& event) {
+        userMessages[user].eventsBySubject[channel].push_back(event);
+    }
+
+    void deleteUser(const std::string& user) {
+        userMessages.erase(user);
     }
 
 /*

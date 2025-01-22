@@ -34,7 +34,6 @@ std::string convertToStompFrame(const std::string &userInput)
         std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
         std::string password = parts.substr(parts.find(' ', spacePos + 1) + 1);
 		userName = username;
-		
         frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"               
                 "\nlogin:" + username + "\npasscode:" + password + "\n\n^0"); 
     }
@@ -57,6 +56,8 @@ std::string convertToStompFrame(const std::string &userInput)
     {
         frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n^0");
         recipt++;
+		userMessages->deleteUser(userName);
+		userName = "";
     }
     else if (starts_with(userInput, "report")) 
     {
@@ -69,10 +70,9 @@ std::string convertToStompFrame(const std::string &userInput)
         std::istringstream iss(userInput.substr(8)); // Skip "summary "
         std::string channelName, userName, filePath;
         iss >> channelName >> userName >> filePath;
-        //std::vector<std::string> events = jsonToEvent(filePath); // להשלים מאיפה אני מביא את הevents
-        //sortEvents(events);
-
-        //generateSummary(channelName, userName, filePath, events);
+        std::vector<Event> events = userMessages->getEvents(userName, channelName);
+        sortEvents(events);
+        generateSummary(channelName, userName, filePath, events);
     }
 
     return frame;
@@ -190,6 +190,7 @@ std::vector<std::string> jsonToEvent(std::string filepath)
     // Create SEND frames for each event
     for (const Event &event : parsedData.events)
     {
+		userMessages->addReport(userName, event.get_channel_name(), event);
         std::ostringstream sendFrame;
         sendFrame << "SEND\n"
                   << "destination:/" << event.get_channel_name() << "\n\n"
@@ -201,7 +202,7 @@ std::vector<std::string> jsonToEvent(std::string filepath)
                   << "    active:" << event.get_general_information().at("active") << "\n"
                   << "    forces arrival at scene:" << event.get_general_information().at("forces_arrival_at_scene") << "\n"
                   << "description:" << event.get_description() << "\n"
-                  << "^@";
+                  << "^0";
         frames.push_back(sendFrame.str());
     }
     return frames;
