@@ -252,3 +252,5 @@ vector<string> jsonToEvent(string filepath)
         std::cout << "Summary generated in file: " << filePath << std::endl;
     }
 }
+
+
