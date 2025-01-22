@@ -2,6 +2,8 @@ package bgu.spl.net.srv;
 
 import bgu.spl.net.api.MessageEncoderDecoder;
 import bgu.spl.net.api.MessagingProtocol;
+import bgu.spl.net.impl.stomp.User;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -17,11 +19,18 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
     private volatile boolean connected = true;
     private int connectionId;
 
-    public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, MessagingProtocol<T> protocol, int conectID) {
+    public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, MessagingProtocol<T> protocol,
+            int conectID) {
         this.sock = sock;
         this.encdec = reader;
         this.protocol = protocol;
         this.connectionId = conectID;
+
+        // initialize the protocol
+        protocol.start(this.connectionId, (Connections<T>) ConnectionsImpl.getInstance());
+
+        // add this connection to the connections
+        ConnectionsImpl.getInstance().addConnectionHandler(this.connectionId, this);
     }
 
     @Override
@@ -32,24 +41,20 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
             in = new BufferedInputStream(sock.getInputStream());
             out = new BufferedOutputStream(sock.getOutputStream());
 
-            // initialize the protocol
-            protocol.start(this.connectionId, (Connections<T>) ConnectionsImpl.getInstance());
-            
-            // add this connection to the connections
-            ConnectionsImpl.getInstance().addConnectionHandler(this.connectionId, this);
-
             while (!protocol.shouldTerminate() && connected && (read = in.read()) >= 0) {
                 T nextMessage = encdec.decodeNextByte((byte) read);
                 if (nextMessage != null) {
                     protocol.process(nextMessage);
                     // if (response != null) {
-                    //     out.write(encdec.encode(response));
-                    //     out.flush();
+                    // out.write(encdec.encode(response));
+                    // out.flush();
                     // }
                 }
             }
-            // if the user is still connected for somne reason, the socket close unexpected, disconnect him
-            if (ConnectionsImpl.getInstance().getUser(this.connectionId).IsConnected()) {
+            // if the user is still connected for somne reason, the socket close unexpected,
+            // disconnect him
+            User<String> user = ConnectionsImpl.getInstance().getUser(this.connectionId);
+            if (user != null && user.IsConnected()) {
                 ConnectionsImpl.getInstance().disconnect(this.connectionId);
             }
             this.close();

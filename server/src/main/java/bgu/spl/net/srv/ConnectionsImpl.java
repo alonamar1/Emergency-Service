@@ -146,7 +146,10 @@ public class ConnectionsImpl implements Connections<String> {
 
     public User<String> getUser(int connectionId) {
         synchronized (connectionIdToUsername) {
-            return userDataBase.getUser(connectionIdToUsername.get(connectionId));
+            String name = connectionIdToUsername.get(connectionId);
+            if (name != null)
+                return userDataBase.getUser(name);
+            return null;
         }
     }
 
