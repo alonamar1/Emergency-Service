@@ -235,7 +235,7 @@ public class Frame {
         }
         System.out.println(username + " UNSUBSCRIBE from " + channel + " with id " + Integer.toString(subscriptionId)
                 + " with recipt " + reciptId);
-        connections.removeSubscriber(channel, subscriptionId);
+        connections.removeSubscriber(channel, subscriptionId, this.connectionId);
         connections.send(this.connectionId, "RECEIPT\nreceipt-id:" + reciptId + "\n\n");
         // TODO: error if there is no id, handle in the client side!
     }
@@ -283,7 +283,7 @@ public class Frame {
             }
         }
         // TODO: need to delete the sunstring function - באמת לא צריך אותה
-        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
+        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest);
 
         // handle the case that there is no such channel
         // TODO: handle the case where the client no register to the channel \ not sent

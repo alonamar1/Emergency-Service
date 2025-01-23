@@ -5,6 +5,10 @@
 #include "../include/event.h"
 #include "../include/dataBaseClient.h"
 
+ChannelEvents::ChannelEvents() : eventsBySubject(std::map<std::string, std::vector<Event>>())
+{
+}
+
 void ChannelEvents::addEvent(const std::string &subject, const Event &content)
 {
     eventsBySubject[subject].push_back(content);
@@ -14,6 +18,8 @@ std::map<std::string, std::vector<Event>> ChannelEvents::getEvents()
 {
     return eventsBySubject;
 }
+
+//-------------------------------------------------------------
 
 DataBaseClient::DataBaseClient() : userMessages(std::map<std::string, ChannelEvents>()) {}
 
@@ -29,7 +35,7 @@ std::vector<Event> DataBaseClient::getEvents(const std::string &user, const std:
 
 void DataBaseClient::addReport(const std::string &user, const std::string &channel, const Event &event)
 {
-    userMessages[user].getEvents()[channel].push_back(event);
+    userMessages[user].addEvent(channel, event);
 }
 
 void DataBaseClient::deleteUser(const std::string &user)

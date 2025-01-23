@@ -10,6 +10,7 @@ public class StompMessageEncoderDecoder implements MessageEncoderDecoder<String>
     private int len = 0;
 
     public String decodeNextByte(byte nextByte) {
+
         if (nextByte == '\u0000') {
             return popString();
         }

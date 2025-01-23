@@ -136,10 +136,16 @@ public class ConnectionsImpl implements Connections<String> {
         return connectionIdToUsername;
     }
 
-    public void removeSubscriber(String channel, int subscriptionId) {
+    public void removeSubscriber(String channel, int subscriptionId, int connectionId) {
         synchronized (channelsSubscribers) {
             if (channelsSubscribers.containsKey(channel)) {
-                channelsSubscribers.get(channel).remove(subscriptionId);
+                List<User<String>> users = channelsSubscribers.get(channel);
+                for (User<String> user : users) {
+                    if (user.GetConnectionId() == connectionId) {
+                        user.removeSubscriptionIdInChannel(subscriptionId);
+                        break;
+                    }
+                }
             }
         }
     }

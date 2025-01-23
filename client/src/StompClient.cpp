@@ -17,6 +17,8 @@ int recipt = 0;
 int id = 0;
 DataBaseClient *userMessages = new DataBaseClient();
 std::string userName;
+std::map<std::string, int> *idInChannel = new std::map<std::string, int>();
+
 
 /**
  * @brief Check if a string starts with a given prefix.
@@ -80,15 +82,14 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 		std::ostringstream sendFrame;
 		sendFrame << "SEND\n"
 				  << "destination:/" << event.get_channel_name() << "\n\n"
-				  << "user:" << event.getEventOwnerUser() << "\n"
+				  << "user:" << userName << "\n"
 				  << "city:" << event.get_city() << "\n"
 				  << "event name:" << event.get_name() << "\n"
 				  << "date time:" << event.get_date_time() << "\n"
 				  << "general information:\n"
 				  << "    active:" << event.get_general_information().at("active") << "\n"
 				  << "    forces arrival at scene:" << event.get_general_information().at("forces_arrival_at_scene") << "\n"
-				  << "description:" << event.get_description() << "\n"
-				  << "^0";
+				  << "description:" << event.get_description() << "\n";
 		frames.push_back(sendFrame.str());
 	}
 	return frames;
@@ -109,14 +110,11 @@ void generateSummary(const std::string &channelName, const std::string &userName
 
 	for (const Event &event : events)
 	{
-		if (event.get_channel_name() == channelName && event.getEventOwnerUser() == userName)
-		{
 			totalEvents++;
 			if (event.get_general_information().at("active") == "true")
 				activeEvents++;
 			if (event.get_general_information().at("forces_arrival_at_scene") == "true")
 				forcedArrivals++;
-		}
 	}
 	outFile << "Total: " << totalEvents << "\n";
 	outFile << "active: " << activeEvents << "\n";
@@ -128,13 +126,12 @@ void generateSummary(const std::string &channelName, const std::string &userName
 
 	for (const Event &event : events)
 	{
-		if (event.get_channel_name() == channelName && event.getEventOwnerUser() == userName)
-		{
-			// Convert timestamp to readable date
+			/* Convert timestamp to readable date
 			std::time_t timestamp = event.get_date_time();
 			std::tm *tm = std::localtime(&timestamp);
 			std::ostringstream dateStream;
 			dateStream << std::put_time(tm, "%d/%m/%Y %H:%M");
+			*/
 
 			// Truncate description
 			std::string truncatedDescription = event.get_description();
@@ -143,12 +140,13 @@ void generateSummary(const std::string &channelName, const std::string &userName
 				truncatedDescription = truncatedDescription.substr(0, 27) + "...";
 			}
 
-			outFile << "Report_" << reportIndex++ << ":\n";
+			outFile << "Report_" << reportIndex << ":\n";
+			reportIndex++;
 			outFile << "city: " << event.get_city() << "\n";
-			outFile << "date time: " << dateStream.str() << "\n";
+			//outFile << "date time: " << dateStream.str() << "\n";
 			outFile << "event name: " << event.get_name() << "\n";
 			outFile << "summary: " << truncatedDescription << "\n";
-		}
+		
 	}
 	outFile.close();
 	std::cout << "Summary generated in file: " << filePath << std::endl;
@@ -169,17 +167,18 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
 		std::string password = parts.substr(parts.find(' ', spacePos + 1) + 1);
 		userName = username;
-		std::cout << "rannnnn" << std::endl;
 		frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
 						 "\nlogin:" +
-						 username + "\npasscode:" + password + "\n\n"+ '\0');
+						 username + "\npasscode:" + password + "\n\n");
+		
 		std::cout << frames[0] << std::endl;
 	}
 	else if (starts_with(userInput, "join"))
 	{
 		{
 			std::string channel = userInput.substr(5);
-			frames.push_back("SUBSCRIBE\ndestination:/" + channel + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n"+ '\0'); //????????????????????
+			frames.push_back("SUBSCRIBE\ndestination:/" + channel + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n"); 
+			(*idInChannel)[channel] = id;
 			recipt++;
 			id++;
 		}
@@ -187,13 +186,13 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	else if (starts_with(userInput, "exit"))
 	{
 		std::string channel = userInput.substr(5);
-		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n" + '\0');
+		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[channel]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
-		id++;
+		
 	}
 	else if (starts_with(userInput, "logout"))
 	{
-		frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n" + '\0');
+		frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
 		userMessages->deleteUser(userName);
 		userName = "";
@@ -204,13 +203,27 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		frames = jsonToEvent(filePath);
 	}
 
-	else if (starts_with(userInput, "summery")) //?????????????????????
+	else if (starts_with(userInput, "summery"))
 	{
 		std::istringstream iss(userInput.substr(8)); // Skip "summary "
 		std::string channelName, userName, filePath;
 		iss >> channelName >> userName >> filePath;
+		std::cout <<channelName << std::endl;
 		std::vector<Event> events = userMessages->getEvents(userName, channelName);
+		for (const Event &event : events)
+		{
+			std::cout << event.get_name() << std::endl;
+			std::cout << event.get_date_time() << "\n" << std::endl;
+
+		}
 		sortEvents(events);
+		for (const Event &event : events)
+		{
+			std::cout << event.get_name() << std::endl;
+			std::cout << event.get_date_time() << "\n" << std::endl;
+
+		}
+
 		generateSummary(channelName, userName, filePath, events);
 	}
 
@@ -236,19 +249,19 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 		{
 			std::lock_guard<std::mutex> lock(mtx);
 			// Send the frame to the server
-			std::cout << "so far" << std::endl;
+			std::cout << frame << std::endl;
 			if (!connectionHandler.sendLine(frame))
 			{
 				std::cerr << "Failed to send frame to server.\n";
 				stopThreads = true;
 			}
-			std::cout << "so far so good" << std::endl;
 
 			if (starts_with(line, "logout"))
 			{
 				stopThreads = true;
 			}
 		}
+
 	}
 }
 
@@ -265,7 +278,7 @@ void readFromServer(ConnectionHandler &connectionHandler)
 			break;
 		}
 
-		std::lock_guard<std::mutex> lock(mtx);
+		//std::lock_guard<std::mutex> lock(mtx);
 		// Process server response
 		std::cout << "Server: " << serverResponse << std::endl;
 		if (starts_with(serverResponse, "RECEIPT"))
@@ -305,6 +318,7 @@ int main(int argc, char *argv[])
 	keyboardThread.join();
 	serverThread.join();
 	delete userMessages;
+	delete idInChannel;
 	return 0;
 }
 

@@ -69,6 +69,11 @@ const std::string &Event::get_description() const
     return this->description;
 }
 
+const void Event::setEventOwnerUser(std::string &setEventOwnerUser)
+{
+    eventOwnerUser = setEventOwnerUser;
+}
+
 Event::Event(const std::string &frame_body): channel_name(""), city(""), 
                                              name(""), date_time(0), description(""), general_information(),
                                              eventOwnerUser("")
