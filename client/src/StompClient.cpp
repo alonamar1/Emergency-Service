@@ -18,7 +18,7 @@ int id = 0;
 DataBaseClient *userMessages = new DataBaseClient();
 std::string userName;
 std::map<std::string, int> *idInChannel = new std::map<std::string, int>();
-
+bool login = false;
 
 /**
  * @brief Check if a string starts with a given prefix.
@@ -61,7 +61,15 @@ bool compareByDateAndName(const Event &a, const Event &b)
  */
 void sortEvents(std::vector<Event> &events)
 {
-	std::sort(events.begin(), events.end(), compareByDateAndName);
+	std::sort(events.begin(), events.end(), [](const Event &a, const Event &b)
+			  {
+				  // Sort primarily by date, and secondarily by name
+				  if (a.get_date_time() != b.get_date_time())
+				  {
+					  return a.get_date_time() < b.get_date_time(); // Ascending order by date
+				  }
+				  return a.get_name() < b.get_name(); // Ascending order by name
+			  });
 }
 
 /**
@@ -78,6 +86,10 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 	// Create SEND frames for each event
 	for (const Event &event : parsedData.events)
 	{
+		if (idInChannel->find(event.get_channel_name()) == idInChannel->end())
+		{
+			frames.push_back("you are not registered to channel" + event.get_channel_name());
+		}
 		userMessages->addReport(userName, event.get_channel_name(), event);
 		std::ostringstream sendFrame;
 		sendFrame << "SEND\n"
@@ -110,43 +122,44 @@ void generateSummary(const std::string &channelName, const std::string &userName
 
 	for (const Event &event : events)
 	{
-			totalEvents++;
-			if (event.get_general_information().at("active") == "true")
-				activeEvents++;
-			if (event.get_general_information().at("forces_arrival_at_scene") == "true")
-				forcedArrivals++;
+		totalEvents++;
+		if (event.get_general_information().at("active") == "true")
+			activeEvents++;
+		if (event.get_general_information().at("forces_arrival_at_scene") == "true")
+			forcedArrivals++;
 	}
 	outFile << "Total: " << totalEvents << "\n";
 	outFile << "active: " << activeEvents << "\n";
 	outFile << "forces arrival at scene: " << forcedArrivals << "\n";
 
 	// Write event reports
-	outFile << "Event Reports:\n";
+	outFile << "Event Reports:\n\n";
 	int reportIndex = 1;
 
 	for (const Event &event : events)
 	{
-			/* Convert timestamp to readable date
-			std::time_t timestamp = event.get_date_time();
-			std::tm *tm = std::localtime(&timestamp);
-			std::ostringstream dateStream;
-			dateStream << std::put_time(tm, "%d/%m/%Y %H:%M");
-			*/
+		std::time_t timestamp = static_cast<std::time_t>(event.get_date_time());
 
-			// Truncate description
-			std::string truncatedDescription = event.get_description();
-			if (truncatedDescription.length() > 27)
-			{
-				truncatedDescription = truncatedDescription.substr(0, 27) + "...";
-			}
+		// Convert epoch to a tm structure
+		std::tm *tm = std::localtime(&timestamp);
 
-			outFile << "Report_" << reportIndex << ":\n";
-			reportIndex++;
-			outFile << "city: " << event.get_city() << "\n";
-			//outFile << "date time: " << dateStream.str() << "\n";
-			outFile << "event name: " << event.get_name() << "\n";
-			outFile << "summary: " << truncatedDescription << "\n";
-		
+		// Format the date and time
+		std::ostringstream oss;
+		oss << std::put_time(tm, "%d/%m/%Y %H:%M:%S");
+
+		// Truncate description
+		std::string truncatedDescription = event.get_description();
+		if (truncatedDescription.length() > 27)
+		{
+			truncatedDescription = truncatedDescription.substr(0, 27) + "...";
+		}
+
+		outFile << "Report_" << reportIndex << ":\n";
+		reportIndex++;
+		outFile << "city: " << event.get_city() << "\n";
+		outFile << "date time: " << oss.str() << "\n";
+		outFile << "event name: " << event.get_name() << "\n";
+		outFile << "summary:" << truncatedDescription << "\n\n";
 	}
 	outFile.close();
 	std::cout << "Summary generated in file: " << filePath << std::endl;
@@ -161,41 +174,102 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	{
 		std::string parts = userInput.substr(6); // Remove "login "
 		size_t colonPos = parts.find(':');
-		// std::string host = parts.substr(0, colonPos);
+		if (colonPos == std::string::npos)
+		{
+			frames.push_back("port are illegal");
+			return frames;
+		}
+		std::string host = parts.substr(0, colonPos);
 		size_t spacePos = parts.find(' ', colonPos);
-		// std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
+		if (spacePos == std::string::npos)
+		{
+			frames.push_back("login command needs 3 args: {host:port} {username} {password}");
+			return frames;
+		}
+		std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
 		std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
-		std::string password = parts.substr(parts.find(' ', spacePos + 1) + 1);
+		size_t spacePos2 = parts.find(' ', spacePos + 1);
+		std::string password = parts.substr(spacePos2 + 1);
+		if (spacePos2 == std::string::npos)
+		{
+			frames.push_back("login command needs 3 args: {host:port} {username} {password}");
+			return frames;
+		}
+		size_t spacePos3 = parts.find(' ', spacePos2 + 1);
+		{
+			if (spacePos2 != std::string::npos)
+			{
+				frames.push_back("login command needs 3 args: {host:port} {username} {password}");
+				return frames;
+			}
+		}
 		userName = username;
 		frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
 						 "\nlogin:" +
 						 username + "\npasscode:" + password + "\n\n");
-		
-		std::cout << frames[0] << std::endl;
+		login = true;
 	}
 	else if (starts_with(userInput, "join"))
 	{
 		{
-			std::string channel = userInput.substr(5);
-			frames.push_back("SUBSCRIBE\ndestination:/" + channel + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n"); 
-			(*idInChannel)[channel] = id;
+			std::string parts = userInput.substr(5); // Remove "join "
+			size_t spacePos = parts.find(' ');
+			if (spacePos != std::string::npos || parts.size() == 0)
+			{
+				frames.push_back("login command needs 1 args: {channel_name}");
+				return frames;
+			}
+			if (!login)
+			{
+				frames.push_back("please login first");
+				return frames;
+			}
+
+			frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+			(*idInChannel)[parts] = id;
 			recipt++;
 			id++;
 		}
 	}
 	else if (starts_with(userInput, "exit"))
 	{
-		std::string channel = userInput.substr(5);
-		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[channel]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+		std::string parts = userInput.substr(5);
+		size_t spacePos = parts.find(' ');
+		if (spacePos != std::string::npos || parts.size() == 0)
+		{
+			frames.push_back("login command needs 1 args: {channel_name}");
+			return frames;
+		}
+		if (!login)
+		{
+			frames.push_back("please login first");
+			return frames;
+		}
+		if (idInChannel->find(parts) == idInChannel->end())
+		{
+			frames.push_back("you are not subscribed to channel" + parts);
+		}
+		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
-		
 	}
 	else if (starts_with(userInput, "logout"))
 	{
+		size_t spacePos = userInput.find(' ');
+		if (spacePos != std::string::npos)
+		{
+			frames.push_back("logout command needs 0 args");
+			return frames;
+		}
+		if (!login)
+		{
+			frames.push_back("please login first");
+			return frames;
+		}
 		frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
 		userMessages->deleteUser(userName);
 		userName = "";
+		login = false;
 	}
 	else if (starts_with(userInput, "report"))
 	{
@@ -208,20 +282,20 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		std::istringstream iss(userInput.substr(8)); // Skip "summary "
 		std::string channelName, userName, filePath;
 		iss >> channelName >> userName >> filePath;
-		std::cout <<channelName << std::endl;
+		std::cout << channelName << std::endl;
 		std::vector<Event> events = userMessages->getEvents(userName, channelName);
 		for (const Event &event : events)
 		{
 			std::cout << event.get_name() << std::endl;
-			std::cout << event.get_date_time() << "\n" << std::endl;
-
+			std::cout << event.get_date_time() << "\n"
+					  << std::endl;
 		}
 		sortEvents(events);
 		for (const Event &event : events)
 		{
 			std::cout << event.get_name() << std::endl;
-			std::cout << event.get_date_time() << "\n" << std::endl;
-
+			std::cout << event.get_date_time() << "\n"
+					  << std::endl;
 		}
 
 		generateSummary(channelName, userName, filePath, events);
@@ -236,13 +310,11 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 	while (!stopThreads)
 	{
 		const short bufsize = 1024;
-        char buf[bufsize];
-        std::cin.getline(buf, bufsize);
+		char buf[bufsize];
+		std::cin.getline(buf, bufsize);
 		std::string line(buf);
-		int len=line.length();
-		
-		/*std::string userInput;
-		std::getline(std::cin, userInput);*/
+		int len = line.length();
+
 		std::vector<std::string> stompFrames = convertToStompFrame(line);
 
 		for (std::string &frame : stompFrames)
@@ -261,7 +333,6 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 				stopThreads = true;
 			}
 		}
-
 	}
 }
 
@@ -273,13 +344,14 @@ void readFromServer(ConnectionHandler &connectionHandler)
 		std::string serverResponse;
 		if (!connectionHandler.getLine(serverResponse))
 		{
-			// std::cerr << ; הודעת ארור
-			stopThreads = true;
+			std::cout << "Disconnected. Exiting...\n"
+					  << std::endl;
 			break;
 		}
 
-		//std::lock_guard<std::mutex> lock(mtx);
-		// Process server response
+		std::lock_guard<std::mutex> lock(mtx);
+		/*
+		//  Process server response
 		std::cout << "Server: " << serverResponse << std::endl;
 		if (starts_with(serverResponse, "RECEIPT"))
 		{
@@ -288,6 +360,19 @@ void readFromServer(ConnectionHandler &connectionHandler)
 		else if (starts_with(serverResponse, "ERROR"))
 		{
 			std::cerr << "Error received from server: " << serverResponse << std::endl;
+		}
+		*/
+		int len = serverResponse.length();
+		// A C string must end with a 0 char delimiter.  When we filled the answer buffer from the socket
+		// we filled up to the \n char - we must make sure now that a 0 char is also present. So we truncate last character.
+		serverResponse.resize(len - 1);
+		std::cout << "Reply: " << serverResponse << " " << len << " bytes " << std::endl
+				  << std::endl;
+		if (serverResponse == "bye")
+		{
+			std::cout << "Exiting...\n"
+					  << std::endl;
+			break;
 		}
 	}
 }
@@ -320,10 +405,4 @@ int main(int argc, char *argv[])
 	delete userMessages;
 	delete idInChannel;
 	return 0;
-}
-
-void sortEventsByTimeApoch(std::vector<Event> &events)
-{
-	std::sort(events.begin(), events.end(), [](const Event &a, const Event &b)
-			  { return a.get_date_time() < b.get_date_time(); });
 }
