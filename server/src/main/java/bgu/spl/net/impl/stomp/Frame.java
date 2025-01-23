@@ -2,10 +2,6 @@ package bgu.spl.net.impl.stomp;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-
-import bgu.spl.net.srv.ConnectionHandler;
-import bgu.spl.net.srv.Connections;
 import bgu.spl.net.srv.ConnectionsImpl;
 
 public class Frame {
@@ -19,14 +15,19 @@ public class Frame {
     public Frame(String message, ConnectionsImpl connection, int conID) {
         headers = new LinkedList<>();
         body = new LinkedList<>();
+        // split the message to lines
         String[] lines = message.split("\n");
+
         this.type = lines[0];
+
         int i = 1;
+        // get the headers
         while (i < lines.length && !lines[i].equals("")) {
             this.headers.add(lines[i]);
             i++;
         }
         i++;
+        // get the body
         while (i < lines.length) {
             this.body.add(lines[i]);
             i++;
@@ -283,7 +284,7 @@ public class Frame {
             }
         }
         // TODO: need to delete the sunstring function - באמת לא צריך אותה
-        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest);
+        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
 
         // handle the case that there is no such channel
         // TODO: handle the case where the client no register to the channel \ not sent
@@ -346,24 +347,12 @@ public class Frame {
      */
     public void handleErrorSendAndDisconnect(String Message) {
         connections.send(this.connectionId, Message);
-        // close the socket in ConnectionHandler
-        try {
-            connections.GetConnectionHandler(this.connectionId).close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        // disconnect the user in ConnectionImpl
-        // TODO: check if need to delete something else
-        // connections.disconnect(this.connectionId);
+
+        // TODO: need to disconnect the handler from Client
+        // try {
+        //     connections.GetConnectionHandler(this.connectionId).close();
+        // } catch (Exception e) {
+        //     e.printStackTrace();
+        // }
     }
-
-    // public static void main(String[] args) {
-    // Frame f = new
-    // Frame("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il\nlogin:admin\npasscode:admin\n\nranivgiAluf\u0000",
-    // null, 1);
-    // System.out.println(f.getType().toString());
-    // System.out.println(f.getHeader().toString());
-    // System.out.println(f.getBody().toString());
-    // }
-
 }
