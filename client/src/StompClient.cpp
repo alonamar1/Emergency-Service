@@ -183,7 +183,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		size_t spacePos = parts.find(' ', colonPos);
 		if (spacePos == std::string::npos)
 		{
-			frames.push_back("login command needs 3 args: {host:port} {username} {password}");
+			frames.push_back("login command needs 3 args: {host:port} {username} {password}1");
 			return frames;
 		}
 		std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
@@ -192,16 +192,15 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		std::string password = parts.substr(spacePos2 + 1);
 		if (spacePos2 == std::string::npos)
 		{
-			frames.push_back("login command needs 3 args: {host:port} {username} {password}");
+			frames.push_back("login command needs 3 args: {host:port} {username} {password}2");
 			return frames;
 		}
 		size_t spacePos3 = parts.find(' ', spacePos2 + 1);
+		std::cout << spacePos3 << std::endl;
+		if (spacePos3 != std::string::npos)
 		{
-			if (spacePos2 != std::string::npos)
-			{
-				frames.push_back("login command needs 3 args: {host:port} {username} {password}");
-				return frames;
-			}
+			frames.push_back("login command needs 3 args: {host:port} {username} {password}3");
+			return frames;
 		}
 		userName = username;
 		frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
@@ -212,16 +211,25 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	else if (starts_with(userInput, "join"))
 	{
 		{
-			std::string parts = userInput.substr(5); // Remove "join "
-			size_t spacePos = parts.find(' ');
-			if (spacePos != std::string::npos || parts.size() == 0)
-			{
-				frames.push_back("login command needs 1 args: {channel_name}");
-				return frames;
-			}
 			if (!login)
 			{
 				frames.push_back("please login first");
+				return frames;
+			}
+			std::string parts;
+			if (userInput.size() >= 5)
+			{
+				parts = userInput.substr(5); // Remove "join "
+				size_t spacePos = parts.find(' ');
+				if (spacePos != std::string::npos || parts.size() == 0)
+				{
+					frames.push_back("join command needs 1 args: {channel_name}");
+					return frames;
+				}
+			}
+			else
+			{
+				frames.push_back("join command needs 1 args: {channel_name}");
 				return frames;
 			}
 
@@ -233,24 +241,35 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	}
 	else if (starts_with(userInput, "exit"))
 	{
-		std::string parts = userInput.substr(5);
-		size_t spacePos = parts.find(' ');
-		if (spacePos != std::string::npos || parts.size() == 0)
-		{
-			frames.push_back("login command needs 1 args: {channel_name}");
-			return frames;
-		}
 		if (!login)
 		{
 			frames.push_back("please login first");
 			return frames;
 		}
+		std::string parts;
+		if (userInput.size() >= 5)
+		{
+			parts = userInput.substr(5); // Remove "exit "
+			size_t spacePos = parts.find(' ');
+			if (spacePos != std::string::npos || parts.size() == 0)
+			{
+				frames.push_back("exit command needs 1 args: {channel_name}");
+				return frames;
+			}
+		}
+		else
+		{
+			frames.push_back("exit command needs 1 args: {channel_name}");
+			return frames;
+		}
+
 		if (idInChannel->find(parts) == idInChannel->end())
 		{
 			frames.push_back("you are not subscribed to channel" + parts);
 		}
 		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
+		idInChannel->erase(parts);
 	}
 	else if (starts_with(userInput, "logout"))
 	{
