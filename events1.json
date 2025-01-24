@@ -70,6 +70,16 @@
                 "active": false,
                 "forces_arrival_at_scene": true
             }
+        },
+        {
+            "event_name": "Arug Possession Arrest",
+            "city": "Gotham City",
+            "date_time": 1735194000,
+            "description": "Police apprehended a suspect in possession of illegal substances near Green Park.",
+            "general_information": {
+                "active": false,
+                "forces_arrival_at_scene": true
+            }
         }
     ]
 }

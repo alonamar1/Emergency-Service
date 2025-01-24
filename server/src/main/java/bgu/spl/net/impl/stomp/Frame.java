@@ -284,7 +284,7 @@ public class Frame {
             }
         }
         // TODO: need to delete the sunstring function - באמת לא צריך אותה
-        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest.substring(1));
+        List<User<String>> usersToSend = this.connections.getChannelsSubscribers().get(dest);
 
         // handle the case that there is no such channel
         // TODO: handle the case where the client no register to the channel \ not sent

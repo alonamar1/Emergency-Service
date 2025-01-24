@@ -12,7 +12,9 @@
 
 // Mutex for thread synchronization
 std::mutex mtx;
-std::atomic<bool> stopThreads(false);
+std::atomic<bool> stopThreadsKeyboard(false);
+std::atomic<bool> stopThreadsServer(false);
+
 int recipt = 0;
 int id = 0;
 DataBaseClient *userMessages = new DataBaseClient();
@@ -202,7 +204,6 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
 		}
 		size_t spacePos3 = parts.find(' ', spacePos2 + 1);
-		std::cout << spacePos3 << std::endl;
 		if (spacePos3 != std::string::npos)
 		{
 			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
@@ -220,25 +221,28 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 			{
 				std::cout << "please login first" << std::endl;
 			}
-			std::string parts;
-			if (userInput.size() >= 5)
+			else
 			{
-				parts = userInput.substr(5); // Remove "join "
-				size_t spacePos = parts.find(' ');
-				if (spacePos != std::string::npos || parts.size() == 0)
+				std::string parts;
+				if (userInput.size() >= 5)
+				{
+					parts = userInput.substr(5); // Remove "join "
+					size_t spacePos = parts.find(' ');
+					if (spacePos != std::string::npos || parts.size() == 0)
+					{
+						std::cout << "join command needs 1 args: {channel_name}" << std::endl;
+					}
+				}
+				else
 				{
 					std::cout << "join command needs 1 args: {channel_name}" << std::endl;
 				}
-			}
-			else
-			{
-				std::cout << "join command needs 1 args: {channel_name}" << std::endl;
-			}
 
-			frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
-			(*idInChannel)[parts] = id;
-			recipt++;
-			id++;
+				frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+				(*idInChannel)[parts] = id;
+				recipt++;
+				id++;
+			}
 		}
 	}
 	else if (starts_with(userInput, "exit"))
@@ -247,28 +251,31 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		{
 			std::cout << "please login first" << std::endl;
 		}
-		std::string parts;
-		if (userInput.size() >= 5)
+		else
 		{
-			parts = userInput.substr(5); // Remove "exit "
-			size_t spacePos = parts.find(' ');
-			if (spacePos != std::string::npos || parts.size() == 0)
+			std::string parts;
+			if (userInput.size() >= 5)
+			{
+				parts = userInput.substr(5); // Remove "exit "
+				size_t spacePos = parts.find(' ');
+				if (spacePos != std::string::npos || parts.size() == 0)
+				{
+					std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
+				}
+			}
+			else
 			{
 				std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
 			}
-		}
-		else
-		{
-			std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
-		}
 
-		if (idInChannel->find(parts) == idInChannel->end())
-		{
-			std::cout << "you are not subscribed to channel" + parts << std::endl;
+			if (idInChannel->find(parts) == idInChannel->end())
+			{
+				std::cout << "you are not subscribed to channel" + parts << std::endl;
+			}
+			frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+			recipt++;
+			idInChannel->erase(parts);
 		}
-		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
-		recipt++;
-		idInChannel->erase(parts);
 	}
 	else if (starts_with(userInput, "logout"))
 	{
@@ -281,11 +288,14 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		{
 			std::cout << "please login first" << std::endl;
 		}
-		frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
-		recipt++;
-		userMessages->deleteUser(userName);
-		userName = "";
-		login = false;
+		else
+		{
+			frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
+			recipt++;
+			userMessages->deleteUser(userName);
+			userName = "";
+			login = false;
+		}
 	}
 	else if (starts_with(userInput, "report"))
 	{
@@ -293,21 +303,24 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		{
 			std::cout << "please login first" << std::endl;
 		}
-		std::string filePath;
-		if (userInput.size() >= 7)
+		else
 		{
-			filePath = userInput.substr(7); // Skip "report "
-			size_t spacePos = filePath.find(' ');
-			if (spacePos != std::string::npos || filePath.size() == 0)
+			std::string filePath;
+			if (userInput.size() >= 7)
+			{
+				filePath = userInput.substr(7); // Skip "report "
+				size_t spacePos = filePath.find(' ');
+				if (spacePos != std::string::npos || filePath.size() == 0)
+				{
+					std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
+				}
+			}
+			else
 			{
 				std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
 			}
+			frames = jsonToEvent(filePath);
 		}
-		else
-		{
-			std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
-		}
-		frames = jsonToEvent(filePath);
 	}
 
 	else if (starts_with(userInput, "summary"))
@@ -344,7 +357,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 // Keyboard thread function
 void readFromKeyboard(ConnectionHandler &connectionHandler)
 {
-	while (!stopThreads)
+	while (!stopThreadsKeyboard)
 	{
 		const short bufsize = 1024;
 		char buf[bufsize];
@@ -358,16 +371,15 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 		{
 			std::lock_guard<std::mutex> lock(mtx);
 			// Send the frame to the server
-			std::cout << frame << std::endl;
 			if (!connectionHandler.sendLine(frame))
 			{
 				std::cerr << "Failed to send frame to server.\n";
-				stopThreads = true;
+				stopThreadsServer = true;
 			}
 
 			if (starts_with(line, "logout"))
 			{
-				stopThreads = true;
+				stopThreadsServer = true;
 			}
 		}
 	}
@@ -376,7 +388,7 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 // Server thread function
 void readFromServer(ConnectionHandler &connectionHandler)
 {
-	while (!stopThreads)
+	while (!stopThreadsServer)
 	{
 		std::string serverResponse;
 		if (!connectionHandler.getLine(serverResponse))
