@@ -12,6 +12,8 @@ public:
     ChannelEvents();
     void addEvent(const std::string &subject, const Event &content);
     std::map<std::string, std::vector<Event>> getEvents();
+    bool noReportsInChannel(const std::string &channel) const;
+
 };
 
 class DataBaseClient
@@ -25,4 +27,7 @@ public:
     std::vector<Event> getEvents(const std::string &user, const std::string &subject);
     void addReport(const std::string &user, const std::string &channel, const Event &event);
     void deleteUser(const std::string &user);
+    bool noReportsInUser(const std::string &user) const;
+
+
 };

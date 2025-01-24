@@ -17,6 +17,7 @@ int recipt = 0;
 int id = 0;
 DataBaseClient *userMessages = new DataBaseClient();
 std::string userName;
+std::map<std::string, std::string> *namesAndPasswords = new std::map<std::string, std::string>();
 std::map<std::string, int> *idInChannel = new std::map<std::string, int>();
 bool login = false;
 
@@ -88,7 +89,7 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 	{
 		if (idInChannel->find(event.get_channel_name()) == idInChannel->end())
 		{
-			frames.push_back("you are not registered to channel" + event.get_channel_name());
+			std::cout << "you are not registered to channel" + event.get_channel_name() << std::endl;
 		}
 		userMessages->addReport(userName, event.get_channel_name(), event);
 		std::ostringstream sendFrame;
@@ -176,31 +177,35 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		size_t colonPos = parts.find(':');
 		if (colonPos == std::string::npos)
 		{
-			frames.push_back("port are illegal");
-			return frames;
+			std::cout << "port are illegal" << std::endl;
 		}
 		std::string host = parts.substr(0, colonPos);
 		size_t spacePos = parts.find(' ', colonPos);
 		if (spacePos == std::string::npos)
 		{
-			frames.push_back("login command needs 3 args: {host:port} {username} {password}1");
-			return frames;
+			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
 		}
 		std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
 		std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
 		size_t spacePos2 = parts.find(' ', spacePos + 1);
 		std::string password = parts.substr(spacePos2 + 1);
+		if (namesAndPasswords->find(username) == namesAndPasswords->end())
+		{
+			namesAndPasswords->insert(std::make_pair(username, password));
+		}
+		else if (password != namesAndPasswords->at(username))
+		{
+			std::cout << "wrong password" << std::endl;
+		}
 		if (spacePos2 == std::string::npos)
 		{
-			frames.push_back("login command needs 3 args: {host:port} {username} {password}2");
-			return frames;
+			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
 		}
 		size_t spacePos3 = parts.find(' ', spacePos2 + 1);
 		std::cout << spacePos3 << std::endl;
 		if (spacePos3 != std::string::npos)
 		{
-			frames.push_back("login command needs 3 args: {host:port} {username} {password}3");
-			return frames;
+			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
 		}
 		userName = username;
 		frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
@@ -213,8 +218,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		{
 			if (!login)
 			{
-				frames.push_back("please login first");
-				return frames;
+				std::cout << "please login first" << std::endl;
 			}
 			std::string parts;
 			if (userInput.size() >= 5)
@@ -223,14 +227,12 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 				size_t spacePos = parts.find(' ');
 				if (spacePos != std::string::npos || parts.size() == 0)
 				{
-					frames.push_back("join command needs 1 args: {channel_name}");
-					return frames;
+					std::cout << "join command needs 1 args: {channel_name}" << std::endl;
 				}
 			}
 			else
 			{
-				frames.push_back("join command needs 1 args: {channel_name}");
-				return frames;
+				std::cout << "join command needs 1 args: {channel_name}" << std::endl;
 			}
 
 			frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
@@ -243,8 +245,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	{
 		if (!login)
 		{
-			frames.push_back("please login first");
-			return frames;
+			std::cout << "please login first" << std::endl;
 		}
 		std::string parts;
 		if (userInput.size() >= 5)
@@ -253,19 +254,17 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 			size_t spacePos = parts.find(' ');
 			if (spacePos != std::string::npos || parts.size() == 0)
 			{
-				frames.push_back("exit command needs 1 args: {channel_name}");
-				return frames;
+				std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
 			}
 		}
 		else
 		{
-			frames.push_back("exit command needs 1 args: {channel_name}");
-			return frames;
+			std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
 		}
 
 		if (idInChannel->find(parts) == idInChannel->end())
 		{
-			frames.push_back("you are not subscribed to channel" + parts);
+			std::cout << "you are not subscribed to channel" + parts << std::endl;
 		}
 		frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
@@ -276,13 +275,11 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		size_t spacePos = userInput.find(' ');
 		if (spacePos != std::string::npos)
 		{
-			frames.push_back("logout command needs 0 args");
-			return frames;
+			std::cout << "logout command needs 0 args" << std::endl;
 		}
 		if (!login)
 		{
-			frames.push_back("please login first");
-			return frames;
+			std::cout << "please login first" << std::endl;
 		}
 		frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
 		recipt++;
@@ -296,11 +293,15 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		frames = jsonToEvent(filePath);
 	}
 
-	else if (starts_with(userInput, "summery"))
+	else if (starts_with(userInput, "summary"))
 	{
 		std::istringstream iss(userInput.substr(8)); // Skip "summary "
 		std::string channelName, userName, filePath;
 		iss >> channelName >> userName >> filePath;
+		if (userMessages->getEvents(userName, channelName).size() == 0)
+		{
+			std::cout << "no repurts to summarize" << std::endl;
+		}
 		std::cout << channelName << std::endl;
 		std::vector<Event> events = userMessages->getEvents(userName, channelName);
 		for (const Event &event : events)
@@ -423,5 +424,6 @@ int main(int argc, char *argv[])
 	serverThread.join();
 	delete userMessages;
 	delete idInChannel;
+	delete namesAndPasswords;
 	return 0;
 }

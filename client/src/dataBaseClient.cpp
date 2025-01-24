@@ -19,6 +19,11 @@ std::map<std::string, std::vector<Event>> ChannelEvents::getEvents()
     return eventsBySubject;
 }
 
+bool ChannelEvents::noReportsInChannel(const std::string &channel) const
+{
+    return eventsBySubject.find(channel) == eventsBySubject.end();
+}
+
 //-------------------------------------------------------------
 
 DataBaseClient::DataBaseClient() : userMessages(std::map<std::string, ChannelEvents>()) {}
@@ -42,3 +47,10 @@ void DataBaseClient::deleteUser(const std::string &user)
 {
     userMessages.erase(user);
 }
+
+bool DataBaseClient::noReportsInUser(const std::string &user) const
+{
+    return userMessages.find(user) == userMessages.end();
+}
+
+
