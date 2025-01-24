@@ -289,7 +289,24 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	}
 	else if (starts_with(userInput, "report"))
 	{
-		std::string filePath = userInput.substr(7); // Skip "report "
+		if (!login)
+		{
+			std::cout << "please login first" << std::endl;
+		}
+		std::string filePath;
+		if (userInput.size() >= 7)
+		{
+			filePath = userInput.substr(7); // Skip "report "
+			size_t spacePos = filePath.find(' ');
+			if (spacePos != std::string::npos || filePath.size() == 0)
+			{
+				std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
+			}
+		}
+		else
+		{
+			std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
+		}
 		frames = jsonToEvent(filePath);
 	}
 
@@ -300,7 +317,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		iss >> channelName >> userName >> filePath;
 		if (userMessages->getEvents(userName, channelName).size() == 0)
 		{
-			std::cout << "no repurts to summarize" << std::endl;
+			std::cout << "no reports to summarize" << std::endl;
 		}
 		std::cout << channelName << std::endl;
 		std::vector<Event> events = userMessages->getEvents(userName, channelName);
