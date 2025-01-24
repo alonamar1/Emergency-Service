@@ -19,7 +19,7 @@ bin/dataBaseClient.o: src/dataBaseClient.cpp
 	g++ $(CFLAGS) -o bin/dataBaseClient.o src/dataBaseClient.cpp
 
 run: bin/StompClient
-	./bin/StompClient 127.0.0.1 7777
+	./bin/StompESClient
 
 .PHONY: clean
 

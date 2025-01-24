@@ -19,7 +19,6 @@ public class StompMessagingProtocolImp implements StompMessagingProtocol<String>
 
     @Override
     public void process(String message) {
-        // TODO: fix the first user connect frame
         Frame frame = new Frame(message, (ConnectionsImpl) connections, connectionId);
         frame.process();
     }
