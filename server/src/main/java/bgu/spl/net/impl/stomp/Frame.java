@@ -347,12 +347,5 @@ public class Frame {
      */
     public void handleErrorSendAndDisconnect(String Message) {
         connections.send(this.connectionId, Message);
-
-        // TODO: need to disconnect the handler from Client
-        // try {
-        //     connections.GetConnectionHandler(this.connectionId).close();
-        // } catch (Exception e) {
-        //     e.printStackTrace();
-        // }
     }
 }

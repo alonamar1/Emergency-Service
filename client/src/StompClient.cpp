@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 #include <iomanip>
+#include <unordered_map>
 #include "../include/event.h"
 #include "../include/dataBaseClient.h"
 #include "../include/ConnectionHandler.h"
@@ -12,16 +13,37 @@
 
 // Mutex for thread synchronization
 std::mutex mtx;
-std::atomic<bool> stopThreadsKeyboard(false);
 std::atomic<bool> stopThreadsServer(false);
 
+// Receipt ID Counter
 int recipt = 0;
+
+// ID subscribe Counter
 int id = 0;
+
+// Object that store the events of the user
 DataBaseClient *userMessages = new DataBaseClient();
+
+// save active user name
 std::string userName;
+
+// Map to store usernames and passwords
 std::map<std::string, std::string> *namesAndPasswords = new std::map<std::string, std::string>();
+
+// Map to store channel name and the corresponding ID subscribed to the channel
 std::map<std::string, int> *idInChannel = new std::map<std::string, int>();
-bool login = false;
+
+// Map to store receipt ID and the corresponding message
+std::unordered_map<int, std::string> receiptToMessage;
+
+// Flag to check if the user is logged in
+std::atomic<bool> login(false);
+
+// Connection handler
+ConnectionHandler *connectionHandler = nullptr;
+
+// Server thread
+std::thread *serverThread = nullptr;
 
 /**
  * @brief Check if a string starts with a given prefix.
@@ -33,9 +55,7 @@ bool login = false;
  */
 bool starts_with(const std::string &source, const std::string &pre)
 {
-	int spacePos = source.find(' ');
-	std::string start = source.substr(0, spacePos);
-	return start == pre;
+	return source.find(pre) == 0;
 }
 
 /**
@@ -110,6 +130,14 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 	return frames;
 }
 
+/**
+ * @brief Generate a summary of events.
+ *
+ * @param channelName
+ * @param userName
+ * @param filePath
+ * @param events
+ */
 void generateSummary(const std::string &channelName, const std::string &userName,
 					 const std::string &filePath, const std::vector<Event> &events)
 {
@@ -168,12 +196,77 @@ void generateSummary(const std::string &channelName, const std::string &userName
 	std::cout << "Summary generated in file: " << filePath << std::endl;
 }
 
-// Convert user input to a STOMP frame
+/**
+ * @brief Disconnect from the current socket. And prepare for a new connection.
+ * 
+ */
+void disconnectFromCurrentSocket()
+{
+	stopThreadsServer = true;
+	connectionHandler->close();
+	delete connectionHandler;
+	connectionHandler = nullptr;
+	login.store(false);
+}
+
+// Server thread function
+void readFromServer()
+{
+	while (!stopThreadsServer)
+	{
+		std::string serverResponse;
+		if (!connectionHandler->getLine(serverResponse))
+		{
+			std::cout << "Disconnected. Exiting...\n"
+					  << std::endl;
+			break;
+		}
+
+		std::lock_guard<std::mutex> lock(mtx);
+		int len = serverResponse.length();
+		serverResponse.resize(len - 1);
+
+		// Print the server response
+		std::cout << "Reply:" << serverResponse << " " << len << " bytes " << std::endl
+				  << std::endl;
+
+		if (starts_with(serverResponse, "RECEIPT"))
+		{
+			int receiptId = std::stoi(serverResponse.substr(serverResponse.find("receipt-id:") + 11));
+			if (receiptToMessage.find(receiptId) != receiptToMessage.end())
+			{
+				if (receiptToMessage[receiptId] == "DISCONNECT")
+				{
+					std::cout << "Logout successful. Disconnecting...\n";
+					// Disconnect from the current socket
+					disconnectFromCurrentSocket();
+				}
+			}
+		}
+
+		if (starts_with(serverResponse, "ERROR"))
+		{
+			std::cout << "ERROR FROM THE SERVER: \n"
+					  << serverResponse << std::endl
+					  << std::endl;
+			std::cout << "Disconnecting...\n";
+			// Disconnect from the current socket
+			disconnectFromCurrentSocket();
+		}
+	}
+}
+
+/**
+ * @brief Convert user input to a STOMP frame.
+ *
+ * @param userInput
+ * @return std::vector<std::string>
+ */
 std::vector<std::string> convertToStompFrame(const std::string &userInput)
 {
 	std::vector<std::string> frames;
 	// Parse user input and create the appropriate STOMP frame
-	if (starts_with(userInput, "login"))
+	if (starts_with(userInput, "login") && !login)
 	{
 		std::string parts = userInput.substr(6); // Remove "login "
 		size_t colonPos = parts.find(':');
@@ -195,24 +288,43 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		{
 			namesAndPasswords->insert(std::make_pair(username, password));
 		}
+		// check passsword in the server
 		else if (password != namesAndPasswords->at(username))
 		{
 			std::cout << "wrong password" << std::endl;
 		}
+
 		if (spacePos2 == std::string::npos)
 		{
 			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
 		}
+
 		size_t spacePos3 = parts.find(' ', spacePos2 + 1);
+
 		if (spacePos3 != std::string::npos)
 		{
 			std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
 		}
+
 		userName = username;
-		frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
-						 "\nlogin:" +
-						 username + "\npasscode:" + password + "\n\n");
-		login = true;
+
+		connectionHandler = new ConnectionHandler(host, std::stoi(port));
+
+		if (!connectionHandler->connect())
+		{
+			std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
+		}
+		else
+		{
+			std::cout << "Connected to " << host << ":" << port << std::endl;
+			// Start server thread
+			stopThreadsServer = false;
+			serverThread = new std::thread(readFromServer);
+			frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
+							 "\nlogin:" +
+							 username + "\npasscode:" + password + "\n\n");
+			login.store(true);
+		}
 	}
 	else if (starts_with(userInput, "join"))
 	{
@@ -240,6 +352,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 
 				frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
 				(*idInChannel)[parts] = id;
+				receiptToMessage[recipt] = "SUBSCRIBE";
 				recipt++;
 				id++;
 			}
@@ -273,6 +386,7 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 				std::cout << "you are not subscribed to channel" + parts << std::endl;
 			}
 			frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+			receiptToMessage[recipt] = "UNSUBSCRIBE";
 			recipt++;
 			idInChannel->erase(parts);
 		}
@@ -291,10 +405,10 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		else
 		{
 			frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
+			receiptToMessage[recipt] = "DISCONNECT";
 			recipt++;
 			userMessages->deleteUser(userName);
 			userName = "";
-			login = false;
 		}
 	}
 	else if (starts_with(userInput, "report"))
@@ -354,10 +468,13 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 	return frames;
 }
 
-// Keyboard thread function
-void readFromKeyboard(ConnectionHandler &connectionHandler)
+/**
+ * @brief Read user input from the keyboard. Convert it to STOMP frames and send it to the server.
+ * 
+ */
+void readFromKeyboard()
 {
-	while (!stopThreadsKeyboard)
+	while (true)
 	{
 		const short bufsize = 1024;
 		char buf[bufsize];
@@ -371,7 +488,7 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 		{
 			std::lock_guard<std::mutex> lock(mtx);
 			// Send the frame to the server
-			if (!connectionHandler.sendLine(frame))
+			if (!connectionHandler->sendLine(frame))
 			{
 				std::cerr << "Failed to send frame to server.\n";
 				stopThreadsServer = true;
@@ -385,72 +502,19 @@ void readFromKeyboard(ConnectionHandler &connectionHandler)
 	}
 }
 
-// Server thread function
-void readFromServer(ConnectionHandler &connectionHandler)
+int main()
 {
-	while (!stopThreadsServer)
-	{
-		std::string serverResponse;
-		if (!connectionHandler.getLine(serverResponse))
-		{
-			std::cout << "Disconnected. Exiting...\n"
-					  << std::endl;
-			break;
-		}
+	// Main thread handles keyboard input
+	readFromKeyboard();
 
-		std::lock_guard<std::mutex> lock(mtx);
-		/*
-		//  Process server response
-		std::cout << "Server: " << serverResponse << std::endl;
-		if (starts_with(serverResponse, "RECEIPT"))
-		{
-			std::cout << "Received acknowledgment from server.\n";
-		}
-		else if (starts_with(serverResponse, "ERROR"))
-		{
-			std::cerr << "Error received from server: " << serverResponse << std::endl;
-		}
-		*/
-		int len = serverResponse.length();
-		// A C string must end with a 0 char delimiter.  When we filled the answer buffer from the socket
-		// we filled up to the \n char - we must make sure now that a 0 char is also present. So we truncate last character.
-		serverResponse.resize(len - 1);
-		std::cout << "Reply: " << serverResponse << " " << len << " bytes " << std::endl
-				  << std::endl;
-		if (serverResponse == "bye")
-		{
-			std::cout << "Exiting...\n"
-					  << std::endl;
-			break;
-		}
-	}
-}
-
-int main(int argc, char *argv[])
-{
-	if (argc < 3)
+	// Join server thread if it is joinable
+	if (serverThread && serverThread->joinable())
 	{
-		std::cerr << "Usage: " << argv[0] << " host port\n";
-		return -1;
+		serverThread->join();
+		delete serverThread;
 	}
 
-	std::string host = argv[1];
-	short port = atoi(argv[2]);
-	ConnectionHandler connectionHandler(host, port);
-
-	if (!connectionHandler.connect())
-	{
-		std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
-		return 1;
-	}
-
-	// Start keyboard and server threads
-	std::thread keyboardThread(readFromKeyboard, std::ref(connectionHandler));
-	std::thread serverThread(readFromServer, std::ref(connectionHandler));
-
-	// Join threads
-	keyboardThread.join();
-	serverThread.join();
+	delete connectionHandler;
 	delete userMessages;
 	delete idInChannel;
 	delete namesAndPasswords;
