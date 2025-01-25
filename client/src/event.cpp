@@ -64,9 +64,19 @@ const std::map<std::string, std::string> &Event::get_general_information() const
     return this->general_information;
 }
 
+void Event::setGeneralInformation(std::map<std::string, std::string> &setGeneralInformation)
+{
+    general_information = setGeneralInformation;
+}
+
 const std::string &Event::get_description() const
 {
     return this->description;
+}
+
+void Event::setDescription(std::string &setDescription)
+{
+    description = setDescription;
 }
 
 const void Event::setEventOwnerUser(std::string &setEventOwnerUser)
@@ -95,7 +105,7 @@ Event::Event(const std::string &frame_body): channel_name(""), city(""),
             if(key == "user") {
                 eventOwnerUser = val;
             }
-            if(key == "channel name") {
+            if(key == "channel name" || key == "destination") {
                 channel_name = val;
             }
             if(key == "city") {

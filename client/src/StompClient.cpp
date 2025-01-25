@@ -113,7 +113,6 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 		{
 			std::cout << "you are not registered to channel" + event.get_channel_name() << std::endl;
 		}
-		userMessages->addReport(userName, event.get_channel_name(), event);
 		std::ostringstream sendFrame;
 		sendFrame << "SEND\n"
 				  << "destination:/" << event.get_channel_name() << "\n\n"
@@ -122,8 +121,8 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 				  << "event name:" << event.get_name() << "\n"
 				  << "date time:" << event.get_date_time() << "\n"
 				  << "general information:\n"
-				  << "    active:" << event.get_general_information().at("active") << "\n"
-				  << "    forces arrival at scene:" << event.get_general_information().at("forces_arrival_at_scene") << "\n"
+				  << "\tactive:" << event.get_general_information().at("active") << "\n"
+				  << "\tforces arrival at scene:" << event.get_general_information().at("forces_arrival_at_scene") << "\n"
 				  << "description:" << event.get_description() << "\n";
 		frames.push_back(sendFrame.str());
 	}
@@ -141,7 +140,7 @@ std::vector<std::string> jsonToEvent(std::string filepath)
 void generateSummary(const std::string &channelName, const std::string &userName,
 					 const std::string &filePath, const std::vector<Event> &events)
 {
-	std::ofstream outFile(filePath, std::ios::app);
+	std::ofstream outFile(filePath, std::ios::trunc);
 	if (!outFile)
 	{
 		std::cerr << "Failed to open file: " << filePath << std::endl;
@@ -198,7 +197,7 @@ void generateSummary(const std::string &channelName, const std::string &userName
 
 /**
  * @brief Disconnect from the current socket. And prepare for a new connection.
- * 
+ *
  */
 void disconnectFromCurrentSocket()
 {
@@ -252,6 +251,45 @@ void readFromServer()
 			std::cout << "Disconnecting...\n";
 			// Disconnect from the current socket
 			disconnectFromCurrentSocket();
+		}
+
+		if (starts_with(serverResponse, "MESSAGE"))
+		{
+			Event event = Event(serverResponse);
+
+			// update the description of the event
+			std::string description;
+			std::string line;
+			std::istringstream ss(serverResponse);
+			while (std::getline(ss, line))
+			{
+				if (line.find("description") != std::string::npos)
+				{
+					description = line.substr(12);
+					event.setDescription(description);
+				}
+			}
+			// Update General Information
+			std::map<std::string, std::string> general_information;
+			std::string active;
+			std::string forces_arrival_at_scene;
+			std::istringstream ss2(serverResponse);
+			while (std::getline(ss2, line))
+			{
+				if (line.find("active") != std::string::npos)
+				{
+					active = line.substr(8);
+					general_information.insert(std::make_pair("active", active));
+				}
+				if (line.find("forces arrival at scene") != std::string::npos)
+				{
+					forces_arrival_at_scene = line.substr(25);
+					general_information.insert(std::make_pair("forces_arrival_at_scene", forces_arrival_at_scene));
+				}
+			}
+			event.setGeneralInformation(general_information);
+			// Add the event to the user's messages
+			userMessages->addReport(userName, event.get_channel_name(), event);
 		}
 	}
 }
@@ -442,35 +480,29 @@ std::vector<std::string> convertToStompFrame(const std::string &userInput)
 		std::istringstream iss(userInput.substr(8)); // Skip "summary "
 		std::string channelName, userName, filePath;
 		iss >> channelName >> userName >> filePath;
-		if (userMessages->getEvents(userName, channelName).size() == 0)
+		std::string searchchannelName = "/" + channelName;
+		if (userMessages->getEvents(userName, searchchannelName).size() == 0)
 		{
 			std::cout << "no reports to summarize" << std::endl;
 		}
 		std::cout << channelName << std::endl;
-		std::vector<Event> events = userMessages->getEvents(userName, channelName);
-		for (const Event &event : events)
-		{
-			std::cout << event.get_name() << std::endl;
-			std::cout << event.get_date_time() << "\n"
-					  << std::endl;
-		}
+		// Get all events for the user and channel
+		std::vector<Event> events = userMessages->getEvents(userName, searchchannelName);
+		// Sort events by date and name
 		sortEvents(events);
-		for (const Event &event : events)
-		{
-			std::cout << event.get_name() << std::endl;
-			std::cout << event.get_date_time() << "\n"
-					  << std::endl;
-		}
-
+		// Generate summary
 		generateSummary(channelName, userName, filePath, events);
 	}
-
+	else
+	{
+		std::cout << "Invalid command" << std::endl;
+	}
 	return frames;
 }
 
 /**
  * @brief Read user input from the keyboard. Convert it to STOMP frames and send it to the server.
- * 
+ *
  */
 void readFromKeyboard()
 {

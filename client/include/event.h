@@ -32,6 +32,8 @@ public:
     const std::string &get_city() const;
     const std::string &get_description() const;
     const std::string &get_name() const;
+    void setDescription(std::string &setDescription);
+    void setGeneralInformation(std::map<std::string, std::string> &setGeneralInformation);
     int get_date_time() const;
     const std::map<std::string, std::string> &get_general_information() const;
     const void setEventOwnerUser(std::string &setEventOwnerUser);
