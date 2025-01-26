@@ -52,5 +52,9 @@ bool DataBaseClient::noReportsInUser(const std::string &user) const
 {
     return userMessages.find(user) == userMessages.end();
 }
+void DataBaseClient::deleteData()
+{
+    userMessages.clear();
+}
 
 

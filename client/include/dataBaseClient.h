@@ -30,6 +30,7 @@ public:
     void addReport(const std::string &user, const std::string &channel, const Event &event);
     void deleteUser(const std::string &user);
     bool noReportsInUser(const std::string &user) const;
+    void deleteData();
 
 
 };

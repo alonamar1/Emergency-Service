@@ -162,90 +162,6 @@ void StompProtocol::generateSummary(const std::string &channelName, const std::s
     std::cout << "Summary generated in file: " << filePath << std::endl;
 }
 
-// void StompProtocol::readFromServer()
-// {
-//     while (!stopThreadsServer)
-//     {
-//         std::string serverResponse;
-//         if (!connectionHandler->getLine(serverResponse))
-//         {
-//             std::cout << "Disconnected. Exiting...\n"
-//                       << std::endl;
-//             break;
-//         }
-
-//         std::lock_guard<std::mutex> lock(mtx);
-//         int len = serverResponse.length();
-//         serverResponse.resize(len - 1);
-
-//         // Print the server response
-//         std::cout << "Reply:" << serverResponse << " " << len << " bytes " << std::endl
-//                   << std::endl;
-
-//         if (StompProtocol::starts_with(serverResponse, "RECEIPT"))
-//         {
-//             int receiptId = std::stoi(serverResponse.substr(serverResponse.find("receipt-id:") + 11));
-//             if (receiptToMessage.find(receiptId) != receiptToMessage.end())
-//             {
-//                 if (receiptToMessage[receiptId] == "DISCONNECT")
-//                 {
-//                     std::cout << "Logout successful. Disconnecting...\n";
-//                     // Disconnect from the current socket
-//                     disconnectFromCurrentSocket();
-//                 }
-//             }
-//         }
-
-//         if (StompProtocol::starts_with(serverResponse, "ERROR"))
-//         {
-//             std::cout << "ERROR FROM THE SERVER: \n"
-//                       << serverResponse << std::endl
-//                       << std::endl;
-//             std::cout << "Disconnecting...\n";
-//             // Disconnect from the current socket
-//             disconnectFromCurrentSocket();
-//         }
-
-//         if (StompProtocol::starts_with(serverResponse, "MESSAGE"))
-//         {
-//             Event event = Event(serverResponse);
-
-//             // update the description of the event
-//             std::string description;
-//             std::string line;
-//             std::istringstream ss(serverResponse);
-//             while (std::getline(ss, line))
-//             {
-//                 if (line.find("description") != std::string::npos)
-//                 {
-//                     description = line.substr(12);
-//                     event.setDescription(description);
-//                 }
-//             }
-//             // Update General Information
-//             std::map<std::string, std::string> general_information;
-//             std::string active;
-//             std::string forces_arrival_at_scene;
-//             std::istringstream ss2(serverResponse);
-//             while (std::getline(ss2, line))
-//             {
-//                 if (line.find("active") != std::string::npos)
-//                 {
-//                     active = line.substr(8);
-//                     general_information.insert(std::make_pair("active", active));
-//                 }
-//                 if (line.find("forces arrival at scene") != std::string::npos)
-//                 {
-//                     forces_arrival_at_scene = line.substr(25);
-//                     general_information.insert(std::make_pair("forces_arrival_at_scene", forces_arrival_at_scene));
-//                 }
-//             }
-//             event.setGeneralInformation(general_information);
-//             // Add the event to the user's messages
-//             userMessages.addReport(userName, event.get_channel_name(), event);
-//         }
-//     }
-// }
 
 /**
  * @brief Read user input from the keyboard. Convert it to STOMP frames and send it to the server.
@@ -309,16 +225,6 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
         size_t spacePos2 = parts.find(' ', spacePos + 1);
         std::string password = parts.substr(spacePos2 + 1);
-        if (namesAndPasswords.find(username) == namesAndPasswords.end())
-        {
-            namesAndPasswords.insert(std::make_pair(username, password));
-        }
-        // check passsword in the server
-        else if (password != namesAndPasswords.at(username))
-        {
-            std::cout << "wrong password" << std::endl;
-        }
-
         if (spacePos2 == std::string::npos)
         {
             std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
@@ -500,6 +406,8 @@ void StompProtocol::disconnectFromCurrentSocket()
     connectionHandler->close();
     delete connectionHandler;
     connectionHandler = nullptr;
+    login = false;
+    userMessages.deleteData();
 }
 
 const std::atomic<bool> &StompProtocol::getStopThreadsServer()
