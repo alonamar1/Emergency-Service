@@ -213,55 +213,63 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
 {
     std::vector<std::string> frames;
     // Parse user input and create the appropriate STOMP frame
-    if ((starts_with(userInput, "login")) & (!login))
+    if ((starts_with(userInput, "login")))
     {
-        std::string parts = userInput.substr(6); // Remove "login "
-        size_t colonPos = parts.find(':');
-        if (colonPos == std::string::npos)
+        if (login)
         {
-            std::cout << "port is illegal" << std::endl;
-        }
-        std::string host = parts.substr(0, colonPos);
-        size_t spacePos = parts.find(' ', colonPos);
-        if (spacePos == std::string::npos)
-        {
-            std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
-        }
-        std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
-        std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
-        size_t spacePos2 = parts.find(' ', spacePos + 1);
-        std::string password = parts.substr(spacePos2 + 1);
-        if (spacePos2 == std::string::npos)
-        {
-            std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
-        }
-
-        size_t spacePos3 = parts.find(' ', spacePos2 + 1);
-
-        if (spacePos3 != std::string::npos)
-        {
-            std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
-        }
-        userName = username;
-        connectionHandler = new ConnectionHandler(host, std::stoi(port));
-        if (!connectionHandler->connect())
-        {
-            std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
+            std::cout << "you are already logged in" << std::endl;
         }
         else
         {
-            std::cout << "Connected to " << host << ":" << port << std::endl;
-            // Start server thread
-            stopThreadsServer = false;
-            // Create a Task object and run it in a separate thread
 
-            Task task;
-            serverThread = new std::thread(&Task::Run, &task);
+            std::string parts = userInput.substr(6); // Remove "login "
+            size_t colonPos = parts.find(':');
+            if (colonPos == std::string::npos)
+            {
+                std::cout << "port is illegal" << std::endl;
+            }
+            std::string host = parts.substr(0, colonPos);
+            size_t spacePos = parts.find(' ', colonPos);
+            if (spacePos == std::string::npos)
+            {
+                std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
+            }
+            std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
+            std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
+            size_t spacePos2 = parts.find(' ', spacePos + 1);
+            std::string password = parts.substr(spacePos2 + 1);
+            if (spacePos2 == std::string::npos)
+            {
+                std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
+            }
 
-            frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
-                             "\nlogin:" +
-                             username + "\npasscode:" + password + "\n\n");
-            login.store(true);
+            size_t spacePos3 = parts.find(' ', spacePos2 + 1);
+
+            if (spacePos3 != std::string::npos)
+            {
+                std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
+            }
+            userName = username;
+            connectionHandler = new ConnectionHandler(host, std::stoi(port));
+            if (!connectionHandler->connect())
+            {
+                std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
+            }
+            else
+            {
+                std::cout << "Connected to " << host << ":" << port << std::endl;
+                // Start server thread
+                stopThreadsServer = false;
+                // Create a Task object and run it in a separate thread
+
+                Task task;
+                serverThread = new std::thread(&Task::Run, &task);
+
+                frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
+                                 "\nlogin:" +
+                                 username + "\npasscode:" + password + "\n\n");
+                login.store(true);
+            }
         }
     }
     else if (starts_with(userInput, "join"))
@@ -381,7 +389,17 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
                     std::cout << "report command needs 1 args: {channel_name}" << std::endl;
                 }
                 else
-                    frames = jsonToEvent(filePath);
+                {
+                    std::ifstream file(filePath);
+                    if (!file.good())
+                    {
+                        std::cout << "Invalid file path: " << filePath << std::endl;
+                    }
+                    else
+                    {
+                        frames = jsonToEvent(filePath);
+                    }
+                }
             }
             else
             {
@@ -406,23 +424,29 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         else
         {
             std::string searchchannelName = "/" + params[1];
-            if (userMessages.getEvents(userName, searchchannelName).size() == 0)
+            if (idInChannel.find(params[1]) != idInChannel.end())
             {
-                std::cout << "no reports to summarize" << std::endl;
+                if (userMessages.getEvents(userName, searchchannelName).size() == 0)
+                {
+                    std::cout << "no reports to summarize" << std::endl;
+                }
+                else
+                {
+                    std::cout << params[0] << std::endl;
+                    // Get all events for the user and channel
+                    std::vector<Event> events = userMessages.getEvents(userName, searchchannelName);
+                    // Sort events by date and name
+                    sortEvents(events);
+                    // Generate summary
+                    generateSummary(params[1], userName, params[3], events);
+                }
             }
             else
             {
-                std::cout << params[0] << std::endl;
-                // Get all events for the user and channel
-                std::vector<Event> events = userMessages.getEvents(userName, searchchannelName);
-                // Sort events by date and name
-                sortEvents(events);
-                // Generate summary
-                generateSummary(params[1], userName, params[3], events);
+                std::cout << "You are not subscribed to channel" << std::endl;
             }
         }
     }
-
     else
     {
         std::cout << "Invalid command" << std::endl;

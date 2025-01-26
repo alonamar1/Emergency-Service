@@ -5,7 +5,7 @@
 
 extern StompProtocol *stomp;
 
-Task::Task(/* args */)
+Task::Task()
 {
 }
 

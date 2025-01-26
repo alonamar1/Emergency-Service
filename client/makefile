@@ -1,7 +1,7 @@
 CFLAGS := -c -Wall -Weffc++ -g -std=c++11 -Iinclude
 LDFLAGS := -lboost_system -lpthread
 
-all: bin/StompClient.exe run
+all: bin/StompClient.exe checkMemo
 
 bin/StompClient.exe: bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o bin/StompProtocol.o bin/Task.o
 	g++ -o bin/StompClient bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o bin/StompProtocol.o bin/Task.o $(LDFLAGS)
@@ -28,6 +28,9 @@ run: bin/StompClient
 	./bin/StompClient
 
 .PHONY: clean
+
+checkMemo:
+	valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./bin/StompClient
 
 clean:
 	rm -f bin/*ק

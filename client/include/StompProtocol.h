@@ -25,7 +25,6 @@ public:
     ConnectionHandler& getConnectionHandler();
     std::mutex &getMutex();
     void disconnectFromCurrentSocket();
-    //void readFromServer();
     void readFromKeyboard();
     std::unordered_map<int, std::string> &getReceiptToMessage();
     DataBaseClient &getUserMessages();
