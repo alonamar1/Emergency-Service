@@ -3,10 +3,34 @@
 #include "../include/event.h"
 #include "../include/dataBaseClient.h"
 #include <unordered_map>
+#include <mutex>
+#include <thread>
+#include <atomic>
+#include <map>
+
 
 // TODO: implement the STOMP protocol
 class StompProtocol
 {
+public:
+    StompProtocol();
+    bool starts_with(const std::string &source, const std::string &pre);
+    bool compareByDateAndName(const Event &a, const Event &b);
+    void sortEvents(std::vector<Event> &events);
+    std::vector<std::string> jsonToEvent(std::string filepath);
+    void generateSummary(const std::string &channelName, const std::string &userName,
+                         const std::string &filePath, const std::vector<Event> &events);
+    std::vector<std::string> convertToStompFrame(const std::string &userInput);
+    const std::atomic<bool>& getStopThreadsServer();
+    ConnectionHandler& getConnectionHandler();
+    std::mutex &getMutex();
+    void disconnectFromCurrentSocket();
+    //void readFromServer();
+    void readFromKeyboard();
+    std::unordered_map<int, std::string> &getReceiptToMessage();
+    DataBaseClient &getUserMessages();
+    std::string &getUserName();
+
 private:
     // Receipt ID Counter
     int recipt;
@@ -38,20 +62,8 @@ private:
     // Server thread
     std::thread *serverThread;
 
-public:
-    StompProtocol();
-    static bool starts_with(const std::string &source, const std::string &pre);
-    bool compareByDateAndName(const Event &a, const Event &b);
-    void sortEvents(std::vector<Event> &events);
-    std::vector<std::string> jsonToEvent(std::string filepath);
-    void generateSummary(const std::string &channelName, const std::string &userName,
-                         const std::string &filePath, const std::vector<Event> &events);
-    static std::vector<std::string> convertToStompFrame(const std::string &userInput);
-    int getRecipt();
-    int getId();
-    std::string getUserName();
-    static void loginStore();
-    static void disconnectFromCurrentSocket();
-    static void getLogin();
-    ~StompProtocol();
+    std::atomic<bool> stopThreadsServer;
+
+    // Mutex for thread synchronization
+    std::mutex mtx;
 };

@@ -1,14 +1,17 @@
 #include "../include/StompProtocol.h"
 #include <fstream>
 #include <iomanip>
+#include <Task.h>
 
 StompProtocol::StompProtocol()
     : recipt(0), id(0), userMessages(DataBaseClient()),
       namesAndPasswords(std::map<std::string, std::string>()),
-      idInChannel(std::map<std::string, int>()), userName(""), connectionHandler(nullptr),serverThread(nullptr)
-      {
-        login.store(false);
-      }
+      idInChannel(std::map<std::string, int>()), userName(""), connectionHandler(nullptr), serverThread(nullptr), mtx()
+{
+    login.store(false);
+    stopThreadsServer.store(false);
+    stopThreadsServer.store(false);
+}
 
 /**
  * @brief Check if a string starts with a given prefix.
@@ -148,7 +151,6 @@ void StompProtocol::generateSummary(const std::string &channelName, const std::s
         {
             truncatedDescription = truncatedDescription.substr(0, 27) + "...";
         }
-
         outFile << "Report_" << reportIndex << ":\n";
         reportIndex++;
         outFile << "city: " << event.get_city() << "\n";
@@ -159,10 +161,126 @@ void StompProtocol::generateSummary(const std::string &channelName, const std::s
     outFile.close();
     std::cout << "Summary generated in file: " << filePath << std::endl;
 }
-void StompProtocol::getLogin()
+
+// void StompProtocol::readFromServer()
+// {
+//     while (!stopThreadsServer)
+//     {
+//         std::string serverResponse;
+//         if (!connectionHandler->getLine(serverResponse))
+//         {
+//             std::cout << "Disconnected. Exiting...\n"
+//                       << std::endl;
+//             break;
+//         }
+
+//         std::lock_guard<std::mutex> lock(mtx);
+//         int len = serverResponse.length();
+//         serverResponse.resize(len - 1);
+
+//         // Print the server response
+//         std::cout << "Reply:" << serverResponse << " " << len << " bytes " << std::endl
+//                   << std::endl;
+
+//         if (StompProtocol::starts_with(serverResponse, "RECEIPT"))
+//         {
+//             int receiptId = std::stoi(serverResponse.substr(serverResponse.find("receipt-id:") + 11));
+//             if (receiptToMessage.find(receiptId) != receiptToMessage.end())
+//             {
+//                 if (receiptToMessage[receiptId] == "DISCONNECT")
+//                 {
+//                     std::cout << "Logout successful. Disconnecting...\n";
+//                     // Disconnect from the current socket
+//                     disconnectFromCurrentSocket();
+//                 }
+//             }
+//         }
+
+//         if (StompProtocol::starts_with(serverResponse, "ERROR"))
+//         {
+//             std::cout << "ERROR FROM THE SERVER: \n"
+//                       << serverResponse << std::endl
+//                       << std::endl;
+//             std::cout << "Disconnecting...\n";
+//             // Disconnect from the current socket
+//             disconnectFromCurrentSocket();
+//         }
+
+//         if (StompProtocol::starts_with(serverResponse, "MESSAGE"))
+//         {
+//             Event event = Event(serverResponse);
+
+//             // update the description of the event
+//             std::string description;
+//             std::string line;
+//             std::istringstream ss(serverResponse);
+//             while (std::getline(ss, line))
+//             {
+//                 if (line.find("description") != std::string::npos)
+//                 {
+//                     description = line.substr(12);
+//                     event.setDescription(description);
+//                 }
+//             }
+//             // Update General Information
+//             std::map<std::string, std::string> general_information;
+//             std::string active;
+//             std::string forces_arrival_at_scene;
+//             std::istringstream ss2(serverResponse);
+//             while (std::getline(ss2, line))
+//             {
+//                 if (line.find("active") != std::string::npos)
+//                 {
+//                     active = line.substr(8);
+//                     general_information.insert(std::make_pair("active", active));
+//                 }
+//                 if (line.find("forces arrival at scene") != std::string::npos)
+//                 {
+//                     forces_arrival_at_scene = line.substr(25);
+//                     general_information.insert(std::make_pair("forces_arrival_at_scene", forces_arrival_at_scene));
+//                 }
+//             }
+//             event.setGeneralInformation(general_information);
+//             // Add the event to the user's messages
+//             userMessages.addReport(userName, event.get_channel_name(), event);
+//         }
+//     }
+// }
+
+/**
+ * @brief Read user input from the keyboard. Convert it to STOMP frames and send it to the server.
+ *
+ */
+void StompProtocol::readFromKeyboard()
 {
-    return login;
+    while (true)
+    {
+        const short bufsize = 1024;
+        char buf[bufsize];
+        std::cin.getline(buf, bufsize);
+        std::string line(buf);
+        int len = line.length();
+
+        std::vector<std::string> stompFrames = StompProtocol::convertToStompFrame(line);
+
+        for (std::string &frame : stompFrames)
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            // Send the frame to the server
+            if (!connectionHandler->sendLine(frame))
+            {
+                std::cerr << "Failed to send frame to server.\n";
+                stopThreadsServer = true;
+            }
+
+            if (StompProtocol::starts_with(line, "logout"))
+            {
+                stopThreadsServer = true;
+            }
+        }
+    }
 }
+
 /**
  * @brief Convert user input to a STOMP frame.
  *
@@ -173,7 +291,7 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
 {
     std::vector<std::string> frames;
     // Parse user input and create the appropriate STOMP frame
-    if (starts_with(userInput, "login") && !getLogin())
+    if ((starts_with(userInput, "login")) & (!login))
     {
         std::string parts = userInput.substr(6); // Remove "login "
         size_t colonPos = parts.find(':');
@@ -191,12 +309,12 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
         size_t spacePos2 = parts.find(' ', spacePos + 1);
         std::string password = parts.substr(spacePos2 + 1);
-        if (namesAndPasswords->find(username) == namesAndPasswords->end())
+        if (namesAndPasswords.find(username) == namesAndPasswords.end())
         {
-            namesAndPasswords->insert(std::make_pair(username, password));
+            namesAndPasswords.insert(std::make_pair(username, password));
         }
         // check passsword in the server
-        else if (password != namesAndPasswords->at(username))
+        else if (password != namesAndPasswords.at(username))
         {
             std::cout << "wrong password" << std::endl;
         }
@@ -224,7 +342,11 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
             std::cout << "Connected to " << host << ":" << port << std::endl;
             // Start server thread
             stopThreadsServer = false;
-            serverThread = new std::thread(readFromServer);
+            // Create a Task object and run it in a separate thread
+
+            Task task;
+            serverThread = new std::thread(&Task::Run, &task);
+
             frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
                              "\nlogin:" +
                              username + "\npasscode:" + password + "\n\n");
@@ -256,7 +378,7 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
                 }
 
                 frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
-                (*idInChannel)[parts] = id;
+                (idInChannel)[parts] = id;
                 receiptToMessage[recipt] = "SUBSCRIBE";
                 recipt++;
                 id++;
@@ -286,14 +408,14 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
                 std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
             }
 
-            if (idInChannel->find(parts) == idInChannel->end())
+            if (idInChannel.find(parts) == idInChannel.end())
             {
                 std::cout << "you are not subscribed to channel" + parts << std::endl;
             }
-            frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((*idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+            frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
             receiptToMessage[recipt] = "UNSUBSCRIBE";
             recipt++;
-            idInChannel->erase(parts);
+            idInChannel.erase(parts);
         }
     }
     else if (starts_with(userInput, "logout"))
@@ -312,7 +434,7 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
             frames.push_back("DISCONNECT\nreceipt:" + std::to_string(recipt) + "\n\n");
             receiptToMessage[recipt] = "DISCONNECT";
             recipt++;
-            userMessages->deleteUser(userName);
+            userMessages.deleteUser(userName);
             userName = "";
         }
     }
@@ -348,13 +470,13 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         std::string channelName, userName, filePath;
         iss >> channelName >> userName >> filePath;
         std::string searchchannelName = "/" + channelName;
-        if (userMessages->getEvents(userName, searchchannelName).size() == 0)
+        if (userMessages.getEvents(userName, searchchannelName).size() == 0)
         {
             std::cout << "no reports to summarize" << std::endl;
         }
         std::cout << channelName << std::endl;
         // Get all events for the user and channel
-        std::vector<Event> events = userMessages->getEvents(userName, searchchannelName);
+        std::vector<Event> events = userMessages.getEvents(userName, searchchannelName);
         // Sort events by date and name
         sortEvents(events);
         // Generate summary
@@ -366,34 +488,43 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
     }
     return frames;
 }
-int getRecipt()
+/**
+ *
+ * @brief Disconnect from the current socket. And prepare for a new connection.
+ *
+ */
+
+void StompProtocol::disconnectFromCurrentSocket()
 {
-    return recipt;
+    stopThreadsServer.store(true);
+    connectionHandler->close();
+    delete connectionHandler;
+    connectionHandler = nullptr;
 }
-int getId()
+
+const std::atomic<bool> &StompProtocol::getStopThreadsServer()
 {
-    return id;
+    return stopThreadsServer;
 }
-std::string getUserName()
+
+ConnectionHandler &StompProtocol::getConnectionHandler()
+{
+    return *connectionHandler;
+}
+
+std::mutex &StompProtocol::getMutex()
+{
+    return mtx;
+}
+std::unordered_map<int, std::string> &StompProtocol::getReceiptToMessage()
+{
+    return receiptToMessage;
+}
+DataBaseClient &StompProtocol::getUserMessages()
+{
+    return userMessages;
+}
+std::string &StompProtocol::getUserName()
 {
     return userName;
 }
-StompProtocol::~StompProtocol()
-{
-    {
-        delete userMessages;
-        delete idInChannel;
-        delete namesAndPasswords;
-    }
-    void loginStore()
-    {
-        login.store(false);
-    }
-    void disconnectFromCurrentSocket()
-    {
-        stopThreadsServer = true;
-        connectionHandler->close();
-        delete connectionHandler;
-        connectionHandler = nullptr;
-        StompProtocol::loginStore();
-    }
