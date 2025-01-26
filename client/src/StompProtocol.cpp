@@ -221,54 +221,60 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         }
         else
         {
-
-            std::string parts = userInput.substr(6); // Remove "login "
-            size_t colonPos = parts.find(':');
-            if (colonPos == std::string::npos)
-            {
-                std::cout << "port is illegal" << std::endl;
-            }
-            std::string host = parts.substr(0, colonPos);
-            size_t spacePos = parts.find(' ', colonPos);
-            if (spacePos == std::string::npos)
+            if (userInput.size() < 6)
             {
                 std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
-            }
-            std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
-            std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
-            size_t spacePos2 = parts.find(' ', spacePos + 1);
-            std::string password = parts.substr(spacePos2 + 1);
-            if (spacePos2 == std::string::npos)
-            {
-                std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
-            }
-
-            size_t spacePos3 = parts.find(' ', spacePos2 + 1);
-
-            if (spacePos3 != std::string::npos)
-            {
-                std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
-            }
-            userName = username;
-            connectionHandler = new ConnectionHandler(host, std::stoi(port));
-            if (!connectionHandler->connect())
-            {
-                std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
             }
             else
             {
-                std::cout << "Connected to " << host << ":" << port << std::endl;
-                // Start server thread
-                stopThreadsServer = false;
-                // Create a Task object and run it in a separate thread
+                std::string parts = userInput.substr(6); // Remove "login "
+                size_t colonPos = parts.find(':');
+                if (colonPos == std::string::npos)
+                {
+                    std::cout << "port is illegal" << std::endl;
+                }
+                std::string host = parts.substr(0, colonPos);
+                size_t spacePos = parts.find(' ', colonPos);
+                if (spacePos == std::string::npos)
+                {
+                    std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
+                }
+                std::string port = parts.substr(colonPos + 1, spacePos - colonPos - 1);
+                std::string username = parts.substr(spacePos + 1, parts.find(' ', spacePos + 1) - spacePos - 1);
+                size_t spacePos2 = parts.find(' ', spacePos + 1);
+                std::string password = parts.substr(spacePos2 + 1);
+                if (spacePos2 == std::string::npos)
+                {
+                    std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
+                }
 
-                Task task;
-                serverThread = new std::thread(&Task::Run, &task);
+                size_t spacePos3 = parts.find(' ', spacePos2 + 1);
 
-                frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
-                                 "\nlogin:" +
-                                 username + "\npasscode:" + password + "\n\n");
-                login.store(true);
+                if (spacePos3 != std::string::npos)
+                {
+                    std::cout << "login command needs 3 args: {host:port} {username} {password}" << std::endl;
+                }
+                userName = username;
+                connectionHandler = new ConnectionHandler(host, std::stoi(port));
+                if (!connectionHandler->connect())
+                {
+                    std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
+                }
+                else
+                {
+                    std::cout << "Connected to " << host << ":" << port << std::endl;
+                    // Start server thread
+                    stopThreadsServer = false;
+                    // Create a Task object and run it in a separate thread
+
+                    Task task;
+                    serverThread = new std::thread(&Task::Run, &task);
+
+                    frames.push_back("CONNECT\naccept-version:1.2\nhost:stomp.cs.bgu.ac.il"
+                                     "\nlogin:" +
+                                     username + "\npasscode:" + password + "\n\n");
+                    login.store(true);
+                }
             }
         }
     }

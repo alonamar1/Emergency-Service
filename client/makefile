@@ -24,10 +24,10 @@ bin/StompProtocol.o: src/StompProtocol.cpp
 bin/Task.o: src/Task.cpp
 	g++ $(CFLAGS) -o bin/Task.o src/Task.cpp
 
-run: bin/StompClient
+run: bin/StompEMIClient.exe
 	./bin/StompEMIClient.exe
 
 .PHONY: clean
 
 clean:
-	rm -f bin/*ק
+	rm -f bin/*
