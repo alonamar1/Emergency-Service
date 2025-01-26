@@ -3,7 +3,7 @@ LDFLAGS := -lboost_system -lpthread
 
 all: bin/StompClient.exe run
 
-bin/StompClient.exe: bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o
+bin/StompClient.exe: bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o bin/StompProtocol.o
 	g++ -o bin/StompClient bin/ConnectionHandler.o bin/StompClient.o bin/event.o bin/dataBaseClient.o $(LDFLAGS)
 
 bin/ConnectionHandler.o: src/ConnectionHandler.cpp
@@ -17,6 +17,9 @@ bin/event.o: src/event.cpp
 
 bin/dataBaseClient.o: src/dataBaseClient.cpp
 	g++ $(CFLAGS) -o bin/dataBaseClient.o src/dataBaseClient.cpp
+
+bin/StompProtocol.o: src/StompProtocol.cpp
+	g++ $(CFLAGS) -o bin/StompProtocol.o src/StompProtocol.cpp
 
 run: bin/StompClient
 	./bin/StompClient
