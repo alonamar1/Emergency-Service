@@ -37,7 +37,7 @@
             "name": "(gdb) Launch stomp client",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/client/bin/StompClient",
+            "program": "${workspaceFolder}/client/bin/StompEMIClient.exe",
             "args": ["127.0.0.1", "7777"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
