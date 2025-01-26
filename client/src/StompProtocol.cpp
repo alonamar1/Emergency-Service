@@ -80,19 +80,23 @@ std::vector<std::string> StompProtocol::jsonToEvent(std::string filepath)
         if (idInChannel.find(event.get_channel_name()) == idInChannel.end())
         {
             std::cout << "you are not registered to channel" + event.get_channel_name() << std::endl;
+            break;
         }
-        std::ostringstream sendFrame;
-        sendFrame << "SEND\n"
-                  << "destination:/" << event.get_channel_name() << "\n\n"
-                  << "user:" << userName << "\n"
-                  << "city:" << event.get_city() << "\n"
-                  << "event name:" << event.get_name() << "\n"
-                  << "date time:" << event.get_date_time() << "\n"
-                  << "general information:\n"
-                  << "\tactive:" << event.get_general_information().at("active") << "\n"
-                  << "\tforces arrival at scene:" << event.get_general_information().at("forces_arrival_at_scene") << "\n"
-                  << "description:" << event.get_description() << "\n";
-        frames.push_back(sendFrame.str());
+        else
+        {
+            std::ostringstream sendFrame;
+            sendFrame << "SEND\n"
+                      << "destination:/" << event.get_channel_name() << "\n\n"
+                      << "user:" << userName << "\n"
+                      << "city:" << event.get_city() << "\n"
+                      << "event name:" << event.get_name() << "\n"
+                      << "date time:" << event.get_date_time() << "\n"
+                      << "general information:\n"
+                      << "\tactive:" << event.get_general_information().at("active") << "\n"
+                      << "\tforces arrival at scene:" << event.get_general_information().at("forces_arrival_at_scene") << "\n"
+                      << "description:" << event.get_description() << "\n";
+            frames.push_back(sendFrame.str());
+        }
     }
     return frames;
 }
@@ -116,52 +120,54 @@ void StompProtocol::generateSummary(const std::string &channelName, const std::s
     int totalEvents = 0, activeEvents = 0, forcedArrivals = 0;
 
     outFile << "Channel: " << channelName << "\n";
-    outFile << "Stats:\n";
-
-    for (const Event &event : events)
+    if (idInChannel.find(channelName) != idInChannel.end())
     {
-        totalEvents++;
-        if (event.get_general_information().at("active") == "true")
-            activeEvents++;
-        if (event.get_general_information().at("forces_arrival_at_scene") == "true")
-            forcedArrivals++;
-    }
-    outFile << "Total: " << totalEvents << "\n";
-    outFile << "active: " << activeEvents << "\n";
-    outFile << "forces arrival at scene: " << forcedArrivals << "\n";
+        outFile << "Stats:\n";
 
-    // Write event reports
-    outFile << "Event Reports:\n\n";
-    int reportIndex = 1;
-
-    for (const Event &event : events)
-    {
-        std::time_t timestamp = static_cast<std::time_t>(event.get_date_time());
-
-        // Convert epoch to a tm structure
-        std::tm *tm = std::localtime(&timestamp);
-
-        // Format the date and time
-        std::ostringstream oss;
-        oss << std::put_time(tm, "%d/%m/%Y %H:%M:%S");
-
-        // Truncate description
-        std::string truncatedDescription = event.get_description();
-        if (truncatedDescription.length() > 27)
+        for (const Event &event : events)
         {
-            truncatedDescription = truncatedDescription.substr(0, 27) + "...";
+            totalEvents++;
+            if (event.get_general_information().at("active") == "true")
+                activeEvents++;
+            if (event.get_general_information().at("forces_arrival_at_scene") == "true")
+                forcedArrivals++;
         }
-        outFile << "Report_" << reportIndex << ":\n";
-        reportIndex++;
-        outFile << "city: " << event.get_city() << "\n";
-        outFile << "date time: " << oss.str() << "\n";
-        outFile << "event name: " << event.get_name() << "\n";
-        outFile << "summary:" << truncatedDescription << "\n\n";
-    }
-    outFile.close();
-    std::cout << "Summary generated in file: " << filePath << std::endl;
-}
+        outFile << "Total: " << totalEvents << "\n";
+        outFile << "active: " << activeEvents << "\n";
+        outFile << "forces arrival at scene: " << forcedArrivals << "\n";
 
+        // Write event reports
+        outFile << "Event Reports:\n\n";
+        int reportIndex = 1;
+
+        for (const Event &event : events)
+        {
+            std::time_t timestamp = static_cast<std::time_t>(event.get_date_time());
+
+            // Convert epoch to a tm structure
+            std::tm *tm = std::localtime(&timestamp);
+
+            // Format the date and time
+            std::ostringstream oss;
+            oss << std::put_time(tm, "%d/%m/%Y %H:%M:%S");
+
+            // Truncate description
+            std::string truncatedDescription = event.get_description();
+            if (truncatedDescription.length() > 27)
+            {
+                truncatedDescription = truncatedDescription.substr(0, 27) + "...";
+            }
+            outFile << "Report_" << reportIndex << ":\n";
+            reportIndex++;
+            outFile << "city: " << event.get_city() << "\n";
+            outFile << "date time: " << oss.str() << "\n";
+            outFile << "event name: " << event.get_name() << "\n";
+            outFile << "summary:" << truncatedDescription << "\n\n";
+        }
+        outFile.close();
+        std::cout << "Summary generated in file: " << filePath << std::endl;
+    }
+}
 
 /**
  * @brief Read user input from the keyboard. Convert it to STOMP frames and send it to the server.
@@ -213,7 +219,7 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         size_t colonPos = parts.find(':');
         if (colonPos == std::string::npos)
         {
-            std::cout << "port are illegal" << std::endl;
+            std::cout << "port is illegal" << std::endl;
         }
         std::string host = parts.substr(0, colonPos);
         size_t spacePos = parts.find(' ', colonPos);
@@ -238,7 +244,6 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         }
         userName = username;
         connectionHandler = new ConnectionHandler(host, std::stoi(port));
-
         if (!connectionHandler->connect())
         {
             std::cerr << "Cannot connect to " << host << ":" << port << std::endl;
@@ -277,17 +282,26 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
                     {
                         std::cout << "join command needs 1 args: {channel_name}" << std::endl;
                     }
+                    else
+                    {
+                        if (idInChannel.find(parts) != idInChannel.end())
+                        {
+                            std::cout << "you are already subscribed to channel" + parts << std::endl;
+                        }
+                        else
+                        {
+                            frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+                            (idInChannel)[parts] = id;
+                            receiptToMessage[recipt] = "SUBSCRIBE";
+                            recipt++;
+                            id++;
+                        }
+                    }
                 }
                 else
                 {
                     std::cout << "join command needs 1 args: {channel_name}" << std::endl;
                 }
-
-                frames.push_back("SUBSCRIBE\ndestination:/" + parts + "\nid:" + std::to_string(id) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
-                (idInChannel)[parts] = id;
-                receiptToMessage[recipt] = "SUBSCRIBE";
-                recipt++;
-                id++;
             }
         }
     }
@@ -308,20 +322,25 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
                 {
                     std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
                 }
+                else
+                {
+                    if (idInChannel.find(parts) == idInChannel.end())
+                    {
+                        std::cout << "you are not subscribed to channel" + parts << std::endl;
+                    }
+                    else
+                    {
+                        frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
+                        receiptToMessage[recipt] = "UNSUBSCRIBE";
+                        recipt++;
+                        idInChannel.erase(parts);
+                    }
+                }
             }
             else
             {
                 std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
             }
-
-            if (idInChannel.find(parts) == idInChannel.end())
-            {
-                std::cout << "you are not subscribed to channel" + parts << std::endl;
-            }
-            frames.push_back("UNSUBSCRIBE\nid:" + std::to_string((idInChannel)[parts]) + "\nreceipt:" + std::to_string(recipt) + "\n\n");
-            receiptToMessage[recipt] = "UNSUBSCRIBE";
-            recipt++;
-            idInChannel.erase(parts);
         }
     }
     else if (starts_with(userInput, "logout"))
@@ -359,35 +378,51 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
                 size_t spacePos = filePath.find(' ');
                 if (spacePos != std::string::npos || filePath.size() == 0)
                 {
-                    std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
+                    std::cout << "report command needs 1 args: {channel_name}" << std::endl;
                 }
+                else
+                    frames = jsonToEvent(filePath);
             }
             else
             {
-                std::cout << "exit command needs 1 args: {channel_name}" << std::endl;
+                std::cout << "report command needs 1 args: {channel_name}" << std::endl;
             }
-            frames = jsonToEvent(filePath);
         }
     }
 
     else if (starts_with(userInput, "summary"))
     {
-        std::istringstream iss(userInput.substr(8)); // Skip "summary "
-        std::string channelName, userName, filePath;
-        iss >> channelName >> userName >> filePath;
-        std::string searchchannelName = "/" + channelName;
-        if (userMessages.getEvents(userName, searchchannelName).size() == 0)
+        std::istringstream iss(userInput); // Skip "summary "
+        std::string param;
+        std::vector<std::string> params;
+        while (iss >> param)
         {
-            std::cout << "no reports to summarize" << std::endl;
+            params.push_back(param);
         }
-        std::cout << channelName << std::endl;
-        // Get all events for the user and channel
-        std::vector<Event> events = userMessages.getEvents(userName, searchchannelName);
-        // Sort events by date and name
-        sortEvents(events);
-        // Generate summary
-        generateSummary(channelName, userName, filePath, events);
+        if (params.size() != 4)
+        {
+            std::cout << "summary command needs 3 args: {channel_name} {username} {filepath}" << std::endl;
+        }
+        else
+        {
+            std::string searchchannelName = "/" + params[1];
+            if (userMessages.getEvents(userName, searchchannelName).size() == 0)
+            {
+                std::cout << "no reports to summarize" << std::endl;
+            }
+            else
+            {
+                std::cout << params[0] << std::endl;
+                // Get all events for the user and channel
+                std::vector<Event> events = userMessages.getEvents(userName, searchchannelName);
+                // Sort events by date and name
+                sortEvents(events);
+                // Generate summary
+                generateSummary(params[1], userName, params[3], events);
+            }
+        }
     }
+
     else
     {
         std::cout << "Invalid command" << std::endl;
@@ -408,6 +443,7 @@ void StompProtocol::disconnectFromCurrentSocket()
     connectionHandler = nullptr;
     login = false;
     userMessages.deleteData();
+    idInChannel.clear();
 }
 
 const std::atomic<bool> &StompProtocol::getStopThreadsServer()
