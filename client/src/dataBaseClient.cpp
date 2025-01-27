@@ -57,4 +57,25 @@ void DataBaseClient::deleteData()
     userMessages.clear();
 }
 
-
+// check if the user exits in database and if he exits check if he has any reports from channel in the data base
+/**
+ * @brief check if the user exits in database
+ *         if he exits check if he has any reports from channel in the data base
+ *
+ * @param user
+ * @param channel
+ * @return true
+ * @return false
+ */
+bool DataBaseClient::checkIfUserHasReports(const std::string &user, const std::string &channel)
+{
+    if (userMessages.find(user) != userMessages.end())
+    {
+        if (userMessages[user].noReportsInChannel(channel))
+        {
+            return false;
+        }
+        return true;
+    }
+    return false;
+}

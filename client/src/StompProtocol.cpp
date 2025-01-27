@@ -79,7 +79,7 @@ std::vector<std::string> StompProtocol::jsonToEvent(std::string filepath)
     {
         if (idInChannel.find(event.get_channel_name()) == idInChannel.end())
         {
-            std::cout << "you are not registered to channel" + event.get_channel_name() << std::endl;
+            std::cout << "you are not registered to channel " + event.get_channel_name() << std::endl;
             break;
         }
         else
@@ -430,26 +430,19 @@ std::vector<std::string> StompProtocol::convertToStompFrame(const std::string &u
         else
         {
             std::string searchchannelName = "/" + params[1];
-            if (idInChannel.find(params[1]) != idInChannel.end())
+            if (userMessages.checkIfUserHasReports(params[2], searchchannelName))
             {
-                if (userMessages.getEvents(userName, searchchannelName).size() == 0)
-                {
-                    std::cout << "no reports to summarize" << std::endl;
-                }
-                else
-                {
-                    std::cout << params[0] << std::endl;
-                    // Get all events for the user and channel
-                    std::vector<Event> events = userMessages.getEvents(userName, searchchannelName);
-                    // Sort events by date and name
-                    sortEvents(events);
-                    // Generate summary
-                    generateSummary(params[1], userName, params[3], events);
-                }
+                std::cout << params[0] << std::endl;
+                // Get all events for the user and channel
+                std::vector<Event> events = userMessages.getEvents(params[2], searchchannelName);
+                // Sort events by date and name
+                sortEvents(events);
+                // Generate summary
+                generateSummary(params[1], userName, params[3], events);
             }
             else
             {
-                std::cout << "You are not subscribed to channel" << std::endl;
+                std::cout << "You are not subscribed to channel OR there aren't reports to summarize" << std::endl;
             }
         }
     }

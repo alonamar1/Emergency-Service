@@ -87,7 +87,7 @@ void Task::Run()
             }
             event.setGeneralInformation(general_information);
             // Add the event to the user's messages
-            stomp->getUserMessages().addReport(stomp->getUserName(), event.get_channel_name(), event);
+            stomp->getUserMessages().addReport(event.getEventOwnerUser(), event.get_channel_name(), event);
         }
     }
 }
